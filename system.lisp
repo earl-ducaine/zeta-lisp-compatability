@@ -1,6 +1,5 @@
 
-
-(in-package :zlisp)
+(in-package :system)
 
 (defmacro printing-random-object ((object stream . keywords)
 				  &body body)

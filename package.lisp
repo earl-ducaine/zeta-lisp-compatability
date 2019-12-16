@@ -1,8 +1,10 @@
 
+(defpackage :system
+  (:nicknames sys)
+  (:use cl)
+  (:export printing-random-object))
 
 (defpackage :zeta-lisp-compatability
-  (:nickname zlisp)
-  (:shadow ignore-errors handler-case restart-case handler-bind
-	   invoke-restart find-restart with-simple-restart
-	   parse-error *default-server-path*)
-   (:use cl))
+  (:nicknames zlisp)
+  (:use cl)
+  (:export with-stack-list))
