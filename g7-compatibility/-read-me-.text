@@ -1,0 +1,22 @@
+
+                        G7-COMPATIBILITY Directory
+
+
+ This directory provides an aid for porting Symbolics Genera 7 software to an
+ Explorer.  The files in this directory provide support for such things as package
+ definitions, character style, flavor system differences, character manipulation,
+ output functions and string functions. 
+
+ Also, two files in the directory provide support for Genera 7 embedded fonts.
+ With these two files loaded, you may compile a Symbolics-generated file with 
+ Genera 7 embedded fonts.  Also, you may look at such a file in Zmacs, and the
+ file should appear just as it would on a Symbolics (fonts included).
+
+ If you are doing a port from the Symbolics, please call the Explorer Hotline at
+ (512)250-6179 and ask for a copy of the latest version of the "Porting Software
+ from Symbolics 36XX to the Texas Instruments Explorer" guide.
+
+
+ In order to make use of this directory, do the following:
+
+ > (make-system 'g7c :noselective :nowarn)

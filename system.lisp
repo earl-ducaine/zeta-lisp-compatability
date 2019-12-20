@@ -1,6 +1,11 @@
 
 (in-package :system)
 
+(defvar *clipping-rectangle-right-edge*)
+(defvar *clipping-rectangle-left-edge*)
+(defvar *clipping-rectangle-top-edge*)
+(defvar *clipping-rectangle-bottom-edge*)
+
 (defmacro printing-random-object ((object stream . keywords)
 				  &body body)
   (let ((typep (memq :typep keywords))
