@@ -1,0 +1,29 @@
+;;; -*- Mode: Common-Lisp; Package:User; Base:10.; Patch-File:T -*-
+;;; Patch directory for Z-TO-C version 2
+;;; Written 05/09/89 13:53:32 by GRAY,
+;;; while running on Kelvin from band LOD2
+;;; With Experimental REL6H 6.15, Experimental SYSTEM 6.0, Experimental VIRTUAL-MEMORY 6.0,
+;;;  Experimental EH 6.0, Experimental MAKE-SYSTEM 6.0, Experimental MICRONET 6.0,
+;;;  Experimental LOCAL-FILE 6.0, Experimental BASIC-PATHNAME 6.0, Experimental NETWORK-SUPPORT-COLD 6.0,
+;;;  Experimental BASIC-NAMESPACE 6.0, Experimental NETWORK-NAMESPACE 6.0, Experimental DISK-IO 6.0,
+;;;  Experimental DISK-LABEL 6.0, Experimental BASIC-FILE 6.0, Experimental MAC-PATHNAME 6.0,
+;;;  Experimental NETWORK-PATHNAME 6.0, Experimental COMPILER 6.0, Experimental TV 6.0,
+;;;  Experimental DATALINK 6.0, Experimental CHAOSNET 6.0, Experimental GC 6.0, Experimental MEMORY-AUX 6.0,
+;;;  Experimental NVRAM 6.0, Experimental SYSLOG 6.0, Experimental STREAMER-TAPE 6.0,
+;;;  Experimental CLEH 1.0, Experimental UCL 6.0, Experimental INPUT-EDITOR 6.0, Experimental METER 6.0,
+;;;  Experimental ZWEI 6.0, Experimental DEBUG-TOOLS 6.0, Experimental NETWORK-SUPPORT 6.0,
+;;;  Experimental NETWORK-SERVICE 6.0, DATALINK-DISPLAYS 6.0, Experimental FONT-EDITOR 6.0,
+;;;  Experimental SERIAL 6.0, Experimental PRINTER 6.0, Experimental MAC-PRINTER-TYPES 6.0,
+;;;  Experimental PRINTER-TYPES 6.0, Experimental IMAGEN 6.0, Experimental SUGGESTIONS 6.0,
+;;;  Experimental MAIL-DAEMON 6.0, Experimental MAIL-READER 6.0, Experimental TELNET 6.0,
+;;;  Experimental VT100 6.0, Experimental NAMESPACE-EDITOR 6.0, Experimental PROFILE 6.0,
+;;;  VISIDOC 6.0, Experimental TI-CLOS 17.6, Experimental CLX 5.0, Experimental CLUE 20.0,
+;;;  Experimental X11M 3.0, Experimental RPC 6.0, Experimental NFS 6.0, Experimental BUG 11.4,
+;;;  IP 3.45, Experimental DOCUMENTER 618.0,  microcode 426, Band Name: Rel6H,Scribe,
+;;; &c, u426 5/4
+
+(:PATCH-SYSTEM-NAME "Z-TO-C" :MAJOR-VERSION 2 :LATEST-MINOR-VERSION 0)
+
+(:EXPERIMENTAL
+((0 "Z-TO-C Loaded" "GRAY" NIL)
+  ))

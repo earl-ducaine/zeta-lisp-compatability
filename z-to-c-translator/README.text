@@ -1,0 +1,42 @@
+
+     TRANSLATOR is a tool for translating from Zetalisp to Common Lisp
+     and from Flavors to CLOS.  It is intended to ease the translation
+     process, not to do all of it.  There is still some redesign
+     involved in porting a program, like the access to strings and the
+     handling of errors.  The translator does understand the #/ macro so
+     there is no need to convert character constants.  The single escape
+     character, /, is also understood and translated.  Other read
+     constants, such as complex numbers, must be converted manually
+     before translating the file or form.
+
+     It may be used either on an entire file or on a form from inside
+     Zmacs.  An entire file can be translated by issuing the command
+
+     (TRANSL:TRANSLATE-FILE <input-file> <output-file> <trace> <new-base>).
+   
+     If <trace> is T then a trace of the translation will be printed on
+     *standard-output*.  <new-base> can be set to be the print base in
+     which all numbers in the code will be printed.  It is advised to
+     also set *PRINT-RADIX* to T so all numbers in the translated code
+     will be printed with the proper base identifier. 
+
+     All of the files in a system can be translated by the command:
+     (TRANSL:TRANSLATE-SYSTEM <system-name> <output-directory>
+			      &key :trace :base :case)
+
+     The key chord HYPER-T is added to ZMACS when the TRANSLATOR system
+     is made.  While in an edit buffer with the cursor at the beginning
+     of a form, pressing HYPER-T will cause the form to be translated.
+     You are prompted to approve the translation.  If you say yes, the
+     translated form will replace the original one.
+
+     The command HYPER-SUPER-T will also attempt to translate back-quote
+     forms that construct code.  This is not normally done except in the
+     body of DEFMACRO forms.
+
+     The translator does not preserve the case or format of the source.
+     This is disturbing to some people.  You can, however, set
+     *PRINT-CASE* to :DOWNCASE, :UPCASE, or :CAPITALIZE and all of the
+     code will be in the selected case.  If you want your code to
+     preserve the look it presently has, use the translator to identify
+     what needs to be modified and then do the modifications manually.
