@@ -7,7 +7,10 @@
   (:import-from new-let nlet)
   (:export art-32b
 	   memq
-	   defstruct))
+	   defstruct
+	   ferror
+	   condition-name-handled-p
+	   fquery))
 
 (defpackage :system
   (:nicknames sys si)
@@ -23,10 +26,12 @@
 	   mouse-x
 	   mouse-y
 	   *prindepth*
-	   READ-DISCARD-FONT-CHANGES
+	   read-discard-font-changes
 	   *lisp-mode*
-	   *READER-SYMBOL-SUBSTITUTIONS*
-	   *COMMON-LISP-SYMBOL-SUBSTITUTIONS*))
+	   *reader-symbol-substitutions*
+	   *common-lisp-symbol-substitutions*
+	   io-stream-p
+	   condition-case-throw))
 
 (defpackage :ticl
   (:use cl))
@@ -44,10 +49,12 @@
 	   defstruct))
 
 (defpackage :zwei
-  (:export SKIP-OVER-BLANK-LINES-AND-COMMENTS
+  (:use cl primitive-zlisp)
+  (:shadowing-import-from primitive-zlisp defstruct)
+  (:export skip-over-blank-lines-and-comments
 	   defcom
-	   WITH-UNDO-SAVE
-	   FORWARD-SEXP
+	   with-undo-save
+	   forward-sexp
 	   point))
 
 (defpackage :compiler
@@ -57,3 +64,13 @@
 (defpackage :transl
   (:use cl)
   (:shadow warning))
+
+(defpackage :conditions
+  (:nicknames eh)
+  (:use cl primitive-zlisp)
+  (:shadowing-import-from primitive-zlisp defstruct)
+  (:export condition-name-handled-p))
+
+(defpackage :cleh
+  (:use cl)
+  (:export restart))
