@@ -1,41 +1,48 @@
-;; -*- Mode:Common-Lisp; Package:(TRANSL :use (lisp ticl)); Base:10 -*-
+
+(in-package :transl)
+
 
 (export '(translate-file translate-system))
 
 (proclaim '(optimize (safety 0) (speed 3)))
-   
-(defvar *hook-hash* (MAKE-HASH-TABLE :size 30 :test #'eq))
-(defvar tr-read (COPY-READTABLE si::standard-readtable ))
-(defvar tr-cl-read (copy-readtable si::common-lisp-readtable))
+
+(defmacro defprop (symbol value property)
+  "make the value of symbol's property property be value."
+  `(progn
+     (setf (get ',symbol ',property) ',value)
+     ',symbol))
+
+(defvar *hook-hash* (make-hash-table :size 30 :test #'eq))
+(defvar tr-read (copy-readtable (copy-readtable nil)))
+(defvar tr-cl-read (copy-readtable (copy-readtable nil)))
 (defparameter cli-package (find-package "CLI"))
-(defprop tr-comm grind-comment  si::grind-macro)
-(defvar  *translate-backquote* nil) ;;phd 4/15/86 added support for backquote translation
- 
+
+(defprop tr-comm grind-comment si::grind-macro)
+
+;; phd 4/15/86 added support for backquote translation
+(defvar  *translate-backquote* nil)
+
 (use-package 'zwei)
 
-(defmacro warning (text  body)
+(defmacro warning (text body)
   (compiler:warn 'translation-warning :ignorable-mistake text)
   body)
-;;;
-;;;  The change in this function skips over blank and comment lines before starting
-;;;  to read the next s-expression.
 
+;; The change in this function skips over blank and comment lines
+;; before starting to read the next s-expression.
 (defun stream-out-next-expression ()
-  "Return a stream for the next s-expression and advance POINT"
-  (prog1 (zwei::INTERVAL-STREAM (zwei:skip-over-blank-lines-and-comments (zwei::point))
-			  (zwei::INTERVAL-LAST-BP zwei::*INTERVAL*) T t)
+  "Return a stream for the next s-expression and advance point"
+  (prog1 (zwei::interval-stream (zwei:skip-over-blank-lines-and-comments (zwei::point))
+			  (zwei::interval-last-bp zwei::*interval*) t t)
 	 (zwei::com-forward-sexp)))
 
-
-;;;
-;;;  The change-occured check avoids all the grinding lossage if there are no changes.
-;;;  The with-undo-save means that one can answer Y and still go back to the
-;;;  original with a single UNDO.
-
+;; The change-occured check avoids all the grinding lossage if there
+;; are no changes.  The with-undo-save means that one can answer Y and
+;; still go back to the original with a single UNDO.
 (zwei:defcom com-translate-next-sexp  "" ()
  (let((context nil) (trace nil) (change-occured nil)
         (*translate-backquote* nil))
-  (declare (special context trace change-occured))
+  ;;(declare (special context trace change-occured))
   (clrhash *hook-hash*)
   (let* ((*print-array* t) ;phd 3/15/86 #(1 2 3) will be printed correctly
 	 (stream (stream-out-next-expression))
@@ -109,12 +116,12 @@
 (zwei::set-comtab zwei::*standard-comtab* `( #\hyper-T com-translate-next-sexp))
 (zwei::set-comtab zwei::*standard-comtab* `( #\hyper-super-T com-translate-next-sexp-including-backquotes))
 
-(zwei:defcom com-install-translator-key 
+(zwei:defcom com-install-translator-key
 	     "Install the Hyper-T key in the current comtab" ()
   (zwei::set-comtab zwei::*comtab* `(#\hyper-T com-translate-next-sexp))
   (zwei::set-comtab zwei::*comtab* `(#\hyper-super-T com-translate-next-sexp-including-backquotes))
   zwei::dis-none)
-  
+
 (si:defprint transl:tr-comm (si:pprint-handler si:pp-objify-comment))
 
 ;; 12/08/88 DNG - Add writing of mode line.  Add CATCH-ERROR-RESTART.
@@ -186,7 +193,7 @@
 (defun translate-system (system-name output-directory
 			 &key (trace nil) base (case *print-case*) (radix *print-radix*))
   "Translates all of the files in a system from Zetalisp to Common Lisp.
-The first argument is the name of the system, and the second is the pathname 
+The first argument is the name of the system, and the second is the pathname
 of the directory where the translated files are to be written.
 TRACE set to T will cause all changes to be printed out on *STANDARD-OUTPUT*
 BASE indicates the print base of the translator, NIL means use the file's base.
@@ -223,9 +230,12 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 	  (return))
 	(find-incompatible-symbol (car sexp)))))
 
+;; It seems the right thing to do is to always return true, i.e. not a
+;; macro compiled program
 (defmacro check-for-fef-area (object)
-  `(/= macro-compiled-program 
-       (sys:%area-number ,object)))
+  t)
+  ;; `(/= macro-compiled-program
+  ;;      (sys:%area-number ,object)))
 
 (defun transpose-package (exp &aux new-sym)
   ;; 2/18/86 added a check for fef area.
@@ -271,7 +281,7 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 		 (when (and (neq new-car (car s))
 			    (check-for-fef-area s))
 		   (setf (car s) new-car))))
-	   s-exp)))      
+	   s-exp)))
 
 (defun trace-change (form exp)
   (declare (special trace context change-occured))
@@ -280,15 +290,15 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
     (let ((*print-length* 3)
 	  (*print-level* 2)
 	  (*readtable* #.*readtable*))
-      (WITH-COMMON-LISP-ON 
+      (WITH-COMMON-LISP-ON
 	(format *standard-output* "~%In ~S~%	 ~S => ~S" (car (last context)) form exp)))))
 
 
-
+;; Used to dynamically
 (defmacro change (form exp)
   "change the contents of the list preserving the first cons cell"
-  ;;phd 2/14/86 Added a check for fef area, in case we trnaslate something
-  ;;coming from a macro expansion.
+  ;; phd 2/14/86 Added a check for fef area, in case we trnaslate
+  ;; something coming from a macro expansion.
   `(when (check-for-fef-area ,(if(atom form) form (second form)))
      ,(if (atom form)
 	  ;the form is the whole list
@@ -328,11 +338,15 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
     (when (consp forms)
       (do ((sub-forms forms (if (consp sub-forms ) (cdr sub-forms) nil)))
 	  ((null sub-forms))
-	(translate-form (if (consp sub-forms) (car sub-forms) sub-forms) context)))
-  t))
+	(translate-form
+	 (if (consp sub-forms)
+	     (car sub-forms)
+	     sub-forms)
+	 context)))
+    t))
 
 (defun translate (form &aux transform macro-function expansion )
-  ;;phd 2/14/86 Added special handling for macros 
+  ;;phd 2/14/86 Added special handling for macros
   (declare (special context change-occured))
   (cond ((atom form)t)
 	((setf transform
@@ -371,11 +385,53 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
     `(defun (:property ,name transform)
 	    ,parm-list ,@body)))
 
-; macro used to define a translation that will only replace the car of the form by the newname
+;; Macro used to define a translation that will only replace the car
+;; of the form by the newname
+;; (defmacro defreplace (name newname)
+;;   `(defun (:property ,name transform)
+;; 	  (form)
+;;      (change (first form) ',newname)))
+
+;; Instead of using the (also) obsolete :property dispatch mechanism
+;; of function definition, simply create a translating macro. This
+;; works well for us because we don't even have the original
+;; definition.
+;; (defmacro defreplace (name newname)
+;;   (emit-defreplace-macro name newname))
+
 (defmacro defreplace (name newname)
-  `(defun (:property ,name transform)
-	  (form)
-     (change (first form) ',newname)))
+  `(defmacro ,name (&body body)
+     `(,',newname ,@body)))
+
+;; (defun emit-defreplace (name newname)
+;;   (let ((form
+;; 	 '(defmacro name (&body body)
+;; 	   `(newname ,@body))))
+;;     (setf (cadr form) name)
+;;     (setf (car (cadr (cadddr form))) newname)
+;;     form))
+
+;; (defun emit-defreplace-macro (name newname)
+;;   `(defmacro ,name (&body body)
+;;      `(,newname ,@body)))
+
+
+;; (defmacro p-defgeneric-options (&body body)
+;;   `(defgeneric ,@body))
+
+
+(p-defgeneric-options
+ add-method
+ ((generic-function
+   (if (typep generic-function 'generic-function)
+       generic-function
+       (get-generic-function-object generic-function)))
+  method)
+ (:documentation "Add a method to a generic function.
+The generic function is destructively modified and returned as the result."))
+
+
+
 
 ;; This function tries to hook the comments to the form that precedes them
 ;; in the context of a top level form
@@ -386,7 +442,7 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
   (declare (ignore char))
   (let ((string (read-line st)))
     (case  si:xr-list-so-far
-	   (:toplevel 
+	   (:toplevel
 	    (values )) ;`(tr-comm ,string))) temporary fix until I figure out something better.(PHD 9/4)
 	   (:after-dot
 	    (values ))
@@ -403,7 +459,7 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
   (declare (ignore char))
   (let ((char (read-char st)))
     (if (eq ':toplevel si:xr-list-so-far)
-	;; create the font change symbol 
+	;; create the font change symbol
 	(values (intern (string-append #.(string #\epsilon) char)))
 	(let* ((len (if (listp  si:xr-list-so-far)
 			(length si:xr-list-so-far)
@@ -416,12 +472,12 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 		     (acons len (list char) (gethash si:xr-list-so-far *hook-hash* ))))
 	  (values )))))
 
-;;;PHD 6/26/86 Added support for #. and #, 
+;;;PHD 6/26/86 Added support for #. and #,
 ;;;The form following #. or #, is translated upon reading (see tranlate-sharp-dot).
 ;;;The pprinter is handling sharp-dot and sharp-comma to print them back as #. and #,
-;;;Note the translation handlers for sharp-dot and sharp-comma, they are there to prevent 
+;;;Note the translation handlers for sharp-dot and sharp-comma, they are there to prevent
 ;;;a second translation during  the translation pass.
-;;;Note that we have to translate  during reading because #. can be found anywhere, like 
+;;;Note that we have to translate  during reading because #. can be found anywhere, like
 ;;;inside a quoted expression.
 (defun translate-sharp-dot (st char ignore)
   (declare (ignore ignore))
@@ -531,10 +587,12 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 (deftranslation defun  (form )
   (let ((new-form (compiler::defun-compatibility (cdr form))))
     (if (eq (cdr new-form)(cdr  form))
-	(progn 
-	  (dolist (l (third form)) ;; loop through the arglist to find forms to translate
+	(progn
+	  ;; loop through the arglist to find forms to translate
+	  (dolist (l (third form))
 	    (when (consp l) (dothis (second l) l)))
-	  (dothese (cdddr form) form)) ;; do the body
+	  ;; do the body
+	  (dothese (cdddr form) form))
 	(progn
 	  (change form new-form)
 	  (translate form)))))

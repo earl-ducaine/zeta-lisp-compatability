@@ -2,6 +2,18 @@
 
 (in-package :primitive-zlisp)
 
+(defun draw-char-cache-state (&optional draw-char-cache)
+  (let ((draw-char-cache (or draw-char-cache *draw-char-cache*)))
+    (%draw-char-cache-state draw-char-cache)))
+
+;; Helper function for creating zetalisp-like structure accessors with
+;; a default pointer.
+(defmacro emulate-default-pointer (structure-name)
+  `(defun draw-char-cache-state (&optional draw-char-cache)
+     (let ((draw-char-cache (or draw-char-cache *draw-char-cache*)))
+       (%draw-char-cache-state draw-char-cache))))
+
+
 (defun make-collector (&optional initial-value)
   "Create a collector function. A Collector function will collect,
    into a list, all the values passed to it in the order in which they

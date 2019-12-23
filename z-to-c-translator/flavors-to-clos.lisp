@@ -1,50 +1,60 @@
-;; -*- Mode:Common-Lisp; Package:(TRANSL :use (lisp ticl)); Base:10 -*-
 
-;;;;-----------------------------Flavors to CLOS translation-------------
+
+
 
 ;;; Copyright (C) 1989 Texas Instruments Incorporated. All rights reserved.
-
-;;  7/05/88 PHD - Initial version.
-;; 10/31/88 DNG - Moved to a separate file from the rest of the translator.
-;; 11/02/88 DNG - Use new function FLAVOR-METHOD-SPEC-P to ensure consistency with DEFMETHOD.
-;; 11/19/88 DNG - Translate body of DEFMETHOD.  Fix query for generic name.  
-;;		Add translation for SEND.  Etc.
-;; 11/21/88 DNG - Improve handling of DEFFLAVOR options.
-;; 11/22/88 DNG - Improve DEFMETHOD handling.
-;; 11/23/88 DNG - Add handling for MULTIPLE-VALUE-SETQ on instance variables.
-;; 11/27/88 DNG - Add special handling for :AROUND methods.
-;; 11/28/88 DNG - Fix to process default values of method arguments.
-;;		Add translation for DEFWRAPPER.
-;; 11/29/88 DNG - Add translation of DEFUN-METHOD.
-;; 12/01/88 DNG - Improve handling of :INIT methods.
-;; 12/06/88 DNG - Add translation of DEFWHOPPER.
-;; 12/09/88 DNG - Add support of :METHOD-COMBINATION option of DEFFLAVOR.
-;; 12/13/88 DNG - Fix argument order on (DEFMETHOD (SETF ...)...).
-;;  1/05/89 DNG - Smarter about when to use SETF for :SET-... messages.
-;;  1/07/89 DNG - Add special handling for (SEND x :SET key value).  Enhance 
-;;		DEFMETHOD translation to try to ensure arglist congruence.  Special 
-;;		handling for arguments of :PRINT-SELF methods.
-;;  1/14/89 DNG - Add special handling for :SEND-IF-HANDLES.
-;;  1/21/89 DNG - Add special handling for :OPERATION-HANDLED-P.
-;;  2/24/89 DNG - Handle :INCLUDED-FLAVORS option of DEFFLAVOR.
-
+;;;
+;;;  7/05/88 PHD - Initial version.
+;;; 10/31/88 DNG - Moved to a separate file from the rest of the translator.
+;;; 11/02/88 DNG - Use new function FLAVOR-METHOD-SPEC-P to ensure consistency with
+;;;                DEFMETHOD.
+;;; 11/19/88 DNG - Translate body of DEFMETHOD.  Fix query for generic name.
+;;;		   Add translation for SEND.  Etc.
+;;; 11/21/88 DNG - Improve handling of DEFFLAVOR options.
+;;; 11/22/88 DNG - Improve DEFMETHOD handling.
+;;; 11/23/88 DNG - Add handling for MULTIPLE-VALUE-SETQ on instance variables.
+;;; 11/27/88 DNG - Add special handling for :AROUND methods.
+;;; 11/28/88 DNG - Fix to process default values of method arguments.
+;;;		   Add translation for DEFWRAPPER.
+;;; 11/29/88 DNG - Add translation of DEFUN-METHOD.
+;;; 12/01/88 DNG - Improve handling of :INIT methods.
+;;; 12/06/88 DNG - Add translation of DEFWHOPPER.
+;;; 12/09/88 DNG - Add support of :METHOD-COMBINATION option of DEFFLAVOR.
+;;; 12/13/88 DNG - Fix argument order on (DEFMETHOD (SETF ...)...).
+;;;  1/05/89 DNG - Smarter about when to use SETF for :SET-... messages.
+;;;  1/07/89 DNG - Add special handling for (SEND x :SET key value).  Enhance
+;;;		   DEFMETHOD translation to try to ensure arglist congruence.  Special
+;;;		   handling for arguments of :PRINT-SELF methods.
+;;;  1/14/89 DNG - Add special handling for :SEND-IF-HANDLES.
+;;;  1/21/89 DNG - Add special handling for :OPERATION-HANDLED-P.
+;;;  2/24/89 DNG - Handle :INCLUDED-FLAVORS option of DEFFLAVOR.
+;;;
 ;;; Not yet handled:	(DECLARE (:SELF-FLAVOR ...))
 ;;;		  	FUNCALL-WITH-MAPPING-TABLE, LEXPR-FUNCALL-WITH-MAPPING-TABLE
 
-(defreplace ticlos:p-defgeneric-options  ticlos:defgeneric)
+;; The following expands to:
+;; (defun (:property p-defgeneric-options transform) (form)
+;;   (change (first form) 'defgeneric))
+;;
+;; Roughly the meaning of this is: whenever you would ordinarily
+;; execute the p-defgeneric-options macro on a top level form, instead
+;; use the defgeneric macro.
+(defreplace p-defgeneric-options defgeneric)
 
-(unless (dont-optimize ; need load-time test
-	  (eq 'ticlos:make-instance 'zl:make-instance))
-  (defreplace zl:make-instance ticlos:make-instance))
+;; Should be able to 'just use' CLOS make-instance version
+;; need load-time test
+;; (unless (eq 'cl:make-instance 'zl:make-instance)
+;;   (defreplace zl:make-instance cl:make-instance))
 
-;;;		Translation of methods
+;;; Translation of methods
 
-(let ((inhibit-fdefine-warnings t)) ; previously defined in TRANSLATE file.
-  (deftranslation zl:defmethod (form)
-    (translate-flavor-method form)) )
+;; previously defined in translate file.
+;; (let ((inhibit-fdefine-warnings t))
+(deftranslation zl:defmethod (form)
+  (translate-flavor-method form))
 
-(deftranslation ticlos:defmethod (form)
-  (when (ticlos::flavor-method-spec-p (second form))
+(deftranslation cl:defmethod (form)
+  (when (cl::flavor-method-spec-p (second form))
     (translate-flavor-method form)))
 
 (defvar *flavor-ivars* nil)
@@ -52,36 +62,46 @@
   (gethash flavor-name *flavor-ivars* '?))
 
 (defvar *hybrid-classes* nil)
-(defvar *untranslated-flavors* nil) 
+(defvar *untranslated-flavors* nil)
 
 (defun hybrid-class-p (name)
-  (or (sys:typep-structure-or-flavor (ticlos:find-class name nil)
-				     'ticlos:hybrid-class)
+  (or (sys:typep-structure-or-flavor (cl:find-class name nil)
+				     'cl:hybrid-class)
       (member name *hybrid-classes* :test #'eq)))
 
 (defvar *arglist-hash-table* nil)
-(defsubst lookup-arglist (function-name)
+
+(defun lookup-arglist (function-name)
   (gethash function-name *arglist-hash-table*))
 
+(defun (setf lookup-arglist) (value function-name)
+  (setf (gethash function-name *arglist-hash-table*) value))
+
+(defun generic-function-p (function)
+  (typep function 'generic-function))
+
 (defun translate-flavor-method (form)
-  ;; Convert a Flavors DEFMETHOD form into a CLOS DEFMETHOD.
+  ;; Convert a flavors defmethod form into a clos defmethod.
   (let* ((spec (second form))
 	 (flavor-name (first spec))
 	 (arglist (third form))
 	 (operation (car (last spec)))
-	 gfun )
-    (dothese (cdddr form) form) ; translate method body
-    (let ((class (ticlos:find-class flavor-name nil)))
+	 gfun)
+    ;; translate method body
+    (dothese (cdddr form) form)
+    (let ((class (cl:find-class flavor-name nil)))
       (when (and class
-		 (not (typep class 'ticlos:flavor-class)))
+		 (not (typep class 'flavor-class)))
 	(setq *untranslated-flavors*
-	      (delete flavor-name (the list *untranslated-flavors*) :test #'eq :count 1))))
-    (unless (null (setq gfun (generic-function-for-operation
-			       operation
-			       (or (foreign-flavor-p flavor-name)
-				   (member flavor-name *untranslated-flavors* :test #'eq))
-			       (and (consp arglist) (null (cdr arglist)))
-			       )))
+	      (delete flavor-name *untranslated-flavors*
+		      :test #'eq :count 1))))
+    (unless (null
+	     (setq gfun (generic-function-for-operation
+			 operation
+			 (or (foreign-flavor-p flavor-name)
+			     (member flavor-name *untranslated-flavors*
+				     :test #'eq))
+			 (and (consp arglist) (null (cdr arglist))))))
       (let ((qualifiers '())
 	    (body-forms (nthcdr 3 form))
 	    (around-args nil))
@@ -94,17 +114,17 @@
 	  (if (eq arglist 'ignore)
 	      (setq arglist `(&rest ignore)
 		    body-forms `((declare (ignore ignore)) nil))
-	    (let (other-arglist)
-	      (if (and (symbolp arglist)
-		       (fboundp arglist)
-		       (dolist (x (setq other-arglist (arglist arglist)) t)
-			 (if (member x lambda-list-keywords :test #'eq)
-			     (return nil))))
-		  (setq body-forms `((,arglist self . ,other-arglist))
-			arglist other-arglist)
-		(setq body-forms `((apply #',arglist self list))
-		      arglist `(&rest list)
-		      )))))
+	      (let (other-arglist)
+		(if (and (symbolp arglist)
+			 (fboundp arglist)
+			 (dolist (x (setq other-arglist (arglist arglist)) t)
+			   (if (member x lambda-list-keywords :test #'eq)
+			       (return nil))))
+		    (setq body-forms `((,arglist self . ,other-arglist))
+			  arglist other-arglist)
+		    (setq body-forms `((apply #',arglist self list))
+			  arglist `(&rest list)
+			  )))))
 	(cond ((equal qualifiers '(:around))
 	       (setq around-args arglist)
 	       (setq arglist (nthcdr 3 arglist)))
@@ -114,39 +134,44 @@
 	  (when (or (member flavor-name *untranslated-flavors* :test #'eq)
 		    (and (equal qualifiers '(:before))
 			 (hybrid-class-p flavor-name)))
-	    ;; Can't translate this since it must be done after shared-initialize, 
-	    ;; but before any other :init methods.
+	    ;; Can't translate this since it must be done after
+	    ;; shared-initialize, but before any other :init methods.
 	    (return-from translate-flavor-method (nlam)))
-	  (setq gfun 'ticlos:shared-initialize)
+	  (setq gfun 'cl:shared-initialize)
 	  (when (null qualifiers)
 	    (setq qualifiers '(:after)))
 	  (unless (eq (car arglist) '&rest)
 	    (push '&rest arglist))
 	  (push 'ignore arglist))
-	(when (eq gfun 'ticlos:print-object) ; has fewer args than :print-self method
+	;; has fewer args than :print-self method
+	(when (eq gfun 'cl:print-object)
 	  (let ((rest-arglist (rest arglist)))
 	    (cond ((null rest-arglist))
 		  ((or (equal rest-arglist '(ignore ignore))
 		       (equal rest-arglist '(&rest ignore)))
 		   (setq arglist (list (first arglist))))
-		  (t (setq arglist `(,(first arglist) &aux (,(second arglist) si:*prindepth*)
-				     (,(third arglist) *print-escape*)))))))
+		  (t (setq arglist `(,(first arglist)
+				      &aux (,(second arglist) si:*prindepth*)
+				      (,(third arglist) *print-escape*)))))))
 	(multiple-value-bind (body decls slot-names self-used)
-	    (process-method-body flavor-name operation arglist body-forms around-args)
+	    (process-method-body flavor-name operation arglist body-forms
+				 around-args)
 	  (let* ((self-name (if (and (null slot-names)
 				     (not self-used)
 				     (not (special-variable-p flavor-name)))
 				flavor-name
-			      'self))
+				'self))
 		 (new-arglist
-		   	(if (and (consp gfun) (eq (car gfun) 'setf))
-			    (if (eq (first arglist) '&rest) ; :before or :after method might do this
-				`(ignore (,self-name ,flavor-name) ,@arglist)
-			      `(,(first arglist) (,self-name ,flavor-name) ,@(rest arglist)))
-			  `((,self-name ,flavor-name) ,@arglist)))
+		  (if (and (consp gfun) (eq (car gfun) 'setf))
+		      ;; :before or :after method might do this
+		      (if (eq (first arglist) '&rest)
+			  `(ignore (,self-name ,flavor-name) ,@arglist)
+			  `(,(first arglist) (,self-name ,flavor-name)
+			     ,@(rest arglist)))
+		      `((,self-name ,flavor-name) ,@arglist)))
 		 (rest-arglist (member '&rest new-arglist :test #'eq)))
 	    (unless (null slot-names)
-	      (setq body `((ticlos:with-slots ,slot-names ,self-name
+	      (setq body `((cl:with-slots ,slot-names ,self-name
 			     . ,body))))
 	    (when (special-variable-p self-name)
 	      (push `(declare (unspecial ,self-name)) body))
@@ -154,22 +179,26 @@
 	      (setf *arglist-hash-table* (make-hash-table :test #'eq)))
 	    (if (and rest-arglist
 		     (eq (second rest-arglist) 'ignore))
-		(let ((gfun-arglist (if (ticlos:generic-function-p gfun)
+		(let ((gfun-arglist (if (generic-function-p gfun)
 					(arglist gfun)
-				      (lookup-arglist gfun))))
+					(lookup-arglist gfun))))
 		  ;; Try to avoid non-conforming parameter list.
-		  (let ((n (position '&rest (the list new-arglist) :test #'eq)))
+		  (let ((n (position '&rest (the list new-arglist)
+				     :test #'eq)))
 		    (when (> (length gfun-arglist) n)
 		      (setf new-arglist
 			    (nconc (firstn n new-arglist)
 				   (nthcdr n gfun-arglist)))
-		      (push `(declare (ignore . ,(loop for arg in (nthcdr n gfun-arglist)
-						       unless (member arg lambda-list-keywords :test #'eq)
-						       collect arg)))
-			    body) )))
-	      (when (symbolp gfun)
-		(setf (lookup-arglist gfun) new-arglist)))
-	    (change form `(ticlos:defmethod ,gfun ,@qualifiers
+		      (push
+		       `(declare
+			 (ignore . ,(loop for arg in (nthcdr n gfun-arglist)
+				       unless (member arg lambda-list-keywords
+						      :test #'eq)
+				       collect arg)))
+		       body) )))
+		(when (symbolp gfun)
+		  (setf (lookup-arglist gfun) new-arglist)))
+	    (change form `(cl:defmethod ,gfun ,@qualifiers
 			    ,new-arglist
 			    ,@decls
 			    ,@body)))))))
@@ -199,8 +228,8 @@
 				    (ticl:VARIABLE-BOUNDP
 				     (compiler:cw-expression (second form))
 				     (when (instance-var-p (second form))
-				       (change form `(ticlos:slot-boundp self ',(second form)))))
-				  #| ; no longer needed, SYMBOL-MACROLET now supports MULTIPLE-VALUE-SETQ.  -- DNG 4/24/89	
+				       (change form `(cl:slot-boundp self ',(second form)))))
+				  #| ; no longer needed, SYMBOL-MACROLET now supports MULTIPLE-VALUE-SETQ.  -- DNG 4/24/89
 				    (MULTIPLE-VALUE-SETQ
 				     (when (= (length form) 3)
 				       (let ((temp `(values . ,(second form))))
@@ -214,22 +243,22 @@
 				     (when (eq (second form) (first around-args))
 				       (change form
 					       (if (eq (fourth form) (third around-args))
-						   `(ticlos:call-next-method)
+						   `(cl:call-next-method)
 						 (if (eq (fourth form) operation)
-						     `(apply #'ticlos:call-next-method self . ,(nthcdr 4 form))
+						     `(apply #'cl:call-next-method self . ,(nthcdr 4 form))
 						   (if (null (nthcdr 4 form))
-						       `(apply #'ticlos:call-next-method self (cdr ,(fourth form)))
-						     `(apply #'ticlos:call-next-method self . ,(nthcdr 4 form))))))))
+						       `(apply #'cl:call-next-method self (cdr ,(fourth form)))
+						     `(apply #'cl:call-next-method self . ,(nthcdr 4 form))))))))
 				    (ticl:FUNCALL-WITH-MAPPING-TABLE
 				     (when (and (eq (second form) (first around-args))
 						(or (eq (fourth form) operation)
 						    (eq (fourth form) (third around-args))))
 				       (change form
-					       `(ticlos:call-next-method self . ,(nthcdr 4 form)))))
+					       `(cl:call-next-method self . ,(nthcdr 4 form)))))
 				    (ticl:CONTINUE-WHOPPER
-				     (change form `(ticlos:call-next-method self . ,(rest form))))
+				     (change form `(cl:call-next-method self . ,(rest form))))
 				    (ticl:LEXPR-CONTINUE-WHOPPER
-				     (change form `(apply #'ticlos:call-next-method self . ,(rest form))))
+				     (change form `(apply #'cl:call-next-method self . ,(rest form))))
 				    )
 				  form))
 			    ;; This function called on each free variable reference.
@@ -270,13 +299,13 @@
   (dolist (x *untranslatable-messages*)
     (setf (gethash x *operation-hash-table*)
 	  x))
-  (dolist (x '((:print-self	ticlos:print-object)
+  (dolist (x '((:print-self	cl:print-object)
 	       (:describe	describe)
-	       (:get		ticlos:get-property)
-	       (:putprop	(setf ticlos:get-property))
-	       (:remprop	ticlos:remove-property)
+	       (:get		cl:get-property)
+	       (:putprop	(setf cl:get-property))
+	       (:remprop	cl:remove-property)
 	       ;; This is for SEND; DEFMETHOD will use SHARED-INITIALIZE.
-	       (:init		ticlos:reinitialize-instance)
+	       (:init		cl:reinitialize-instance)
 	       (:tyi		read-char)
 	       ;;(:tyo		write-char) ; different argument order
 	       (:read-char	read-char)
@@ -289,7 +318,7 @@
 	       (:listen		listen)
 	       (:clear-input	clear-input)
 	       (:truename	truename)
-	       (:fasd-form	ticlos:make-load-form)
+	       (:fasd-form	cl:make-load-form)
 	       ))
     (setf (gethash (first x) *operation-hash-table*) (second x)))
   *operation-hash-table*)
@@ -309,7 +338,7 @@
     (if x
 	(if (keywordp x)
 	    (let ((symbol (find-symbol name *package*)))
-	      (if (and symbol (ticlos:generic-function-p symbol))
+	      (if (and symbol (cl:generic-function-p symbol))
 		  ;; user defined his own generic function for this.
 		  symbol
 		;; else can't translate it.
@@ -325,7 +354,7 @@
 		   (multiple-value-bind (symbol indicator)
 		       (intern name *package*)
 		     (if (or (null indicator)	; symbol didn't previously exist
-			     (ticlos:generic-function-p symbol)
+			     (cl:generic-function-p symbol)
 			     (and (neq indicator ':inherited)
 				  (not (fboundp symbol))))
 			 symbol
@@ -340,7 +369,7 @@
 			       )
 			 (loop (format *query-io* "~&What is the name of the generic function for message ~s ? "
 				       keyword)
-			       ;; Use READ-LINE instead of READ in order to require pressing RETURN 
+			       ;; Use READ-LINE instead of READ in order to require pressing RETURN
 			       ;; instead of terminating on any non-symbol character.
 			       (let* ((line (read-line *query-io*))
 				      (*error-output* *query-io*)
@@ -373,9 +402,9 @@
 			(setq gfun (generic-function-for-operation gfun nil nil)))
 		   (change form `(setf (,gfun ,(second form))
 				       ,(fifth form)))
-		 ;; This isn't exactly correct since the slot name will be in the wrong 
+		 ;; This isn't exactly correct since the slot name will be in the wrong
 		 ;; package, but it's a step in the right direction.
-		 (change form `(setf (ticlos:slot-value ,(second form) ,(fourth form))
+		 (change form `(setf (cl:slot-value ,(second form) ,(fourth form))
 				     ,(fifth form))))))
 	    ((and (eq operation ':send-if-handles)
 		  (>= (length form) 4)
@@ -434,11 +463,11 @@ A better way is to write a default method or a method for NO-APPLICABLE-METHOD."
 This is used by the translator as a crude equivalent to :SEND-IF-HANDLES.
 A better way is to write a default method or a method for NO-APPLICABLE-METHOD."
     (if (every #'compiler:trivial-form-p (the list (cdr form)))
-	`(and (ticlos:handlesp #',(car form) . ,(cdr form))
+	`(and (cl:handlesp #',(car form) . ,(cdr form))
 	      ,form)
       (let ((temp (gensym)))
 	`(with-stack-list (,temp . ,(cdr form))
-	   (and (apply #'ticlos:handlesp #',(car form) ,temp)
+	   (and (apply #'cl:handlesp #',(car form) ,temp)
 		(apply #',(car form) ,temp))))))
   )
 
@@ -447,7 +476,7 @@ A better way is to write a default method or a method for NO-APPLICABLE-METHOD."
     "Evaluate generic function call FORM, or return NIL if there is no applicable method.
 This is used by the translator as a crude equivalent to :SEND-IF-HANDLES.
 A better way is to write your own method for NO-APPLICABLE-METHOD."
-    ;; Actually we only want to ignore NO-APPLICABLE-METHOD errors, but that 
+    ;; Actually we only want to ignore NO-APPLICABLE-METHOD errors, but that
     ;; does not yet have a distinct condition name.
     `(values (ignore-errors ,form)))
   )
@@ -455,16 +484,16 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 (defun argument-handled-p (defn arg)
   (declare (arglist generic-function first-argument))
   "This is used by the translator as a crude equivalent to the :OPERATION-HANDLED-P message."
-  (let* ((gfun (cond ((sys:typep-structure-or-flavor defn 'ticlos:generic-function)
+  (let* ((gfun (cond ((sys:typep-structure-or-flavor defn 'cl:generic-function)
 		      defn)
-		     ((ticlos:generic-function-p defn)
-		      (ticlos:get-generic-function-object defn))
+		     ((cl:generic-function-p defn)
+		      (cl:get-generic-function-object defn))
 		     ((functionp defn) (return-from argument-handled-p defn))
 		     (t (error "~S is not a function." defn))
 		     ))
 	 (arg-class (clos:class-of arg)))
-    (dolist (ml (ticlos:generic-function-method-list gfun) nil)
-      (when (ticlos:subclassp arg-class (car ml))
+    (dolist (ml (cl:generic-function-method-list gfun) nil)
+      (when (cl:subclassp arg-class (car ml))
 	(return t)))))
 
 (deftranslation ticl:lexpr-send (form)
@@ -485,10 +514,10 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 ;;;		Translation of DEFFLAVOR to DEFCLASS
 
 (defparameter *flavor-substitution-table*
-	`((si:property-list-mixin . ticlos:property-mixin))
+	`((si:property-list-mixin . cl:property-mixin))
   "A-list of flavor names and the corresponding class name to be used instead.")
 
-(deftranslation ticl:defflavor (form &aux outside-accessible-slots default-initargs 
+(deftranslation ticl:defflavor (form &aux outside-accessible-slots default-initargs
 				          inittable-slots gettable-slots settable-slots
 					  accessor-prefix doc combinations)
   (when (null *operation-hash-table*) (initialize-operation-table))
@@ -517,7 +546,7 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 	  (:default-init-plist
 	   (setf default-initargs (cdr option)))
 	  (:INCLUDED-FLAVORS
-	   ;; The distinction between component flavors and included flavors is 
+	   ;; The distinction between component flavors and included flavors is
 	   ;; probably not needed with the different class precedence ordering of CLOS.
 	   (setf supers (append supers (cdr option))))
 	  (:documentation
@@ -541,10 +570,10 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 			    (meth (sys:fdefinition-safe `(:method ,name ,(car x) ,operation) t))
 			    (arglist (cond (meth (cons (intern "OBJECT" *package*)
 						       (cdr (arglist meth))))
-					   ((ticlos:generic-function-p gfun)
+					   ((cl:generic-function-p gfun)
 					    (arglist gfun t))
 					   (t `(,(intern "OBJECT" *package*) &rest ,(intern "ARGS" *package*))))))
-		     (pushnew `(ticlos:defgeneric ,gfun
+		     (pushnew `(cl:defgeneric ,gfun
 						  ,arglist
 				 (:method-combination ,combiner ,(case (second x)
 								     (:base-flavor-first :most-specific-last)
@@ -568,10 +597,10 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 	    ((eq settable-slots 't)
 	     (setf inittable-slots 't))
 	    (t (setf inittable-slots (union inittable-slots settable-slots))))
-      (let ((slots (ticlos:collect-body
+      (let ((slots (cl:collect-body
 		     (dolist (slot slots)
 		       (let ((slot-name (if (consp slot) (car slot) slot)))
-			 (ticlos:collect
+			 (cl:collect
 			   `(,slot-name
 			     ,@(if (and (consp slot) (cdr slot)) `(:initform ,(cadr slot)))
 			     ,@(if (find-slot slot-name outside-accessible-slots )
@@ -608,7 +637,7 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 			    (when (symbolp super)
 			      (when (and (foreign-flavor-p super)
 					 (not (hybrid-class-p super)))
-				;; Including a flavor that appears to be defined outside of the 
+				;; Including a flavor that appears to be defined outside of the
 				;; program being translated.
 				(let ((temp (assoc super *flavor-substitution-table* :test #'eq)))
 				  (if temp
@@ -617,8 +646,8 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 				    ;; Else this will need to be a hybrid class so it can inherit the flavor.
 				    (progn (pushnew name *hybrid-classes* :test #'eq)
 					   (setq substitution-alist nil)
-					   (return '((:metaclass ticlos:hybrid-class))))))))))
-	       (new-form `(ticlos:defclass ,name ,(sublis substitution-alist supers :test #'eq)
+					   (return '((:metaclass cl:hybrid-class))))))))))
+	       (new-form `(cl:defclass ,name ,(sublis substitution-alist supers :test #'eq)
 			    ,slots
 			    ,@(and default-initargs `((:default-initargs ,@default-initargs)))
 			    ,@(and doc `((:documentation ,doc)))
@@ -645,11 +674,11 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
   (destructuring-bind ((flavor-name operation) (arglist . body) &rest wrapper)
 		      (cdr form)
     (change form
-	    `(ticlos:defmethod ,(generic-function-for-operation operation nil (consp arglist))
+	    `(cl:defmethod ,(generic-function-for-operation operation nil (consp arglist))
 			       :around
 	                       ((self ,flavor-name) . ,arglist)
 	       (declare (unspecial self))
-	       ,(progv (list body) '(((ticlos:call-next-method)))
+	       ,(progv (list body) '(((cl:call-next-method)))
 		  (apply #'progn wrapper))))))
 
 
@@ -668,7 +697,7 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
     (multiple-value-bind (body decls slot-names)
 	(process-method-body flavor-name nil arglist body-forms)
       (unless (null slot-names)
-	(setq body `((ticlos:with-slots ,slot-names (the ,flavor-name self)
+	(setq body `((cl:with-slots ,slot-names (the ,flavor-name self)
 		       . ,body))))
       (change form `(defun ,function-spec ,arglist
 		      ,@decls
@@ -678,8 +707,3 @@ A better way is to write your own method for NO-APPLICABLE-METHOD."
 (deftranslation COMPILE-FLAVOR-METHODS (form) ; no CLOS equivalent
   (change form `(comment ,(copy-list form)))
   t)
-
-
-
-
-
