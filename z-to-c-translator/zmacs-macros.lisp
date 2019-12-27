@@ -102,29 +102,52 @@
 	(pos 0)
 	(res '()))
     (loop while (and (< pos len)
-		     (string-match "[^ \\t\\n\\f]+" string pos))
+		     (string-match
+		      ;; "[^ \\t\\n\\f]+"
+		      (:greedy-repetition
+		       1 nil
+		       (:inverted-char-class #\space #\tab #\newline #\page))
+		      string pos))
       (let* ((word-beg (match-beginning 0))
 	     (word-end (match-end 0))
 	     (word (substring string word-beg len))
 	     (times 1)
 	     key)
 	;; Try to catch events of the form "<as df>".
-	(if (string-match "\\`<[^ <>\t\n\f][^>\t\n\f]*>" word)
+	(if (string-match
+	     ;; "<[^ <>\\t\\n\\f][^>\\t\\n\\f]*>"
+	     (:sequence
+	      #\<
+	      (:inverted-char-class #\space #\< #\> #\tab
+				    #\newline #\page)
+	      (:greedy-repetition
+	       0 nil
+	       (:inverted-char-class #\> #\tab #\newline #\page))
+	      #\>)
+	     word)
 	    (setq word (match-string 0 word)
 		  pos (+ word-beg (match-end 0)))
 	  (setq word (substring string word-beg word-end)
 		pos word-end))
-	(when (string-match "\\([0-9]+\\)\\*." word)
+	(when (string-match
+	       ;; "([0-9]+)."
+	       (:sequence
+		(:register (:greedy-repetition
+			    1 nil (:char-class (:range #\0 #\9))))
+		:everything)
+	       word)
 	  (setq times (string-to-number (substring word 0 (match-end 1))))
 	  (setq word (substring word (1+ (match-end 1)))))
-	(cond ((string-match "^<<.+>>$" word)
-	       (setq key (vconcat (if (eq (key-binding [?\M-x])
-					  'execute-extended-command)
-				      [?\M-x]
-				    (or (car (where-is-internal
-					      'execute-extended-command))
-					[?\M-x]))
-				  (substring word 2 -2) "\r")))
+	(cond ((string-match
+		;; "^<<.+>>$"
+		;; Execute extended command key irespective of where
+		;; it's bound.
+		(:sequence :start-anchor "<<"
+			   (:greedy-repetition 1 nil :everything)
+			   ">>" :end-anchor)
+		word)
+	       (setq key `((meta #\x)
+			   ,(intern (string-upcase (substring word 2 -2))))))
 	      ((and (string-match "^\\(\\([ACHMsS]-\\)*\\)<\\(.+\\)>$" word)
 		    (progn
 		      (setq word (concat (substring word (match-beginning 1)
