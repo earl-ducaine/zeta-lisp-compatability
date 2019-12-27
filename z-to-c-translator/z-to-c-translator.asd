@@ -12,10 +12,8 @@
 
 
 
-
-
 (asdf:defsystem :z-to-c
-  :depends-on (misc-extensions)
+  :depends-on (misc-extensions conium cl-utilities)
   :components
   ((:file translate)
    (:file new-translate)

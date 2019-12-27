@@ -49,7 +49,7 @@
 	   defstruct))
 
 (defpackage :zwei
-  (:use cl primitive-zlisp)
+  (:use cl primitive-zlisp cl-utilities)
   (:shadowing-import-from primitive-zlisp defstruct)
   (:export skip-over-blank-lines-and-comments
 	   defcom
@@ -62,14 +62,18 @@
    warn))
 
 (defpackage :transl
-  (:use cl)
-  (:shadow warning))
+  (:use cl zwei)
+  (:shadow warning)
+  (:export translate-file
+	   translate-system
+	   condition-case-throw))
 
 (defpackage :conditions
   (:nicknames eh)
   (:use cl primitive-zlisp)
   (:shadowing-import-from primitive-zlisp defstruct)
-  (:export condition-name-handled-p))
+  (:export condition-name-handled-p
+	   condition-case-throw))
 
 (defpackage :cleh
   (:use cl)

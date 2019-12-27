@@ -7,4 +7,5 @@
   ((:file package)
    (:file primitive)
    (:file system)
-   (:file zeta-lisp-compatability)))
+   (:file zeta-lisp-compatability)
+   (:file z-to-c-translator/translate)))
