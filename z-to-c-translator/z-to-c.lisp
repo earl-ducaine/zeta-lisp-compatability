@@ -10,12 +10,16 @@
 
 (deftranslation zl:aloc (form)
   (change form `(locf (aref ,@(cdr form)))))
+
 (deftranslation zl:ap-leader (form)
   (change form `(locf (array-leader ,@(cdr form)))))
+
 (deftranslation zl:ap-1 (form)
   (change form `(locf (ar-1 ,@(cdr form)))))
+
 (deftranslation zl:ap-2 (form)
   (change form `(locf (ar-2 ,@(cdr form)))))
+
 (deftranslation zl:ap-3 (form)
   (change form `(locf (ar-3 ,@(cdr form)))))
 
@@ -80,7 +84,7 @@ make sure it can be done." (setf (aref ,(third form) ,@(nthcdr 3 form)) ,(second
         ;; B
 
 (defreplace	zl:bit-test           logtest)
-	
+
 	;; C
 (deftranslation zl:caseq (form)
   (change (first form) 'case)
@@ -122,7 +126,7 @@ make sure it can be done." (setf (aref ,(third form) ,@(nthcdr 3 form)) ,(second
 (defreplace	zl:copylist           copy-list)
 (defreplace	zl:copysymbol         copy-symbol)
 (defreplace	zl:copytree           copy-tree)
-	
+
 	;; D
 ;	debug-io           *debug-io*
 (deftranslation def (form) ;; to get aoround the bad macroexpander.
@@ -159,7 +163,7 @@ make sure it can be done." (setf (aref ,(third form) ,@(nthcdr 3 form)) ,(second
 			  (get (intern option 'keyword) 'si:defstruct-type-description))
 		     (setf type `((:type ,option)))))))
       (delete (cadar type) (the list name-and-options) :test #'eq :count 1)
-      (when conc-name 
+      (when conc-name
       (delete :conc-name (the list name-and-options ) :test #'eq :count 1)))
     (dolist (slot (cddr form))
       (if (and (consp slot) (cdr slot))
@@ -177,7 +181,7 @@ make sure it can be done." (setf (aref ,(third form) ,@(nthcdr 3 form)) ,(second
 				 type )
 	       ,@(nthcdr 2 form)))
     t))
-    
+
 (deftranslation zl:defunp (form)
   (change form (macroexpand form))
   (translate form)
@@ -272,7 +276,7 @@ make sure it can be done." (setf (aref ,(third form) ,@(nthcdr 3 form)) ,(second
     (when (>= (length (second form)) 3)
       (dothis (third (second form)) form)))
   t)
-	
+
 	;; E
 ;	error-output       *error-output*
 
@@ -300,7 +304,7 @@ make sure it can be done." (every ,(third form) ,(second form))))
   (if (stringp (second  form))
       (change form `(error  ,(second form)))
       (change form  `(ferror ,@(cdr  form)))))
-	
+
 	;; F
 ; (defreplace     ferror             error) ;first approximation
 (deftranslation zl:find-position-in-list (form)
@@ -350,9 +354,9 @@ make sure it can be done." (every ,(third form) ,(second form))))
 	       (last nil))
 	      ((null comm))
 	    (if  (<= 4 (caar comm))
-		 (progn 
+		 (progn
 		   (setf (caar comm) (-  (caar comm ) 2))
-		   (if last    
+		   (if last
 		       (setf (cdr last ) (cdr comm))
 		       (setf (second pointer) (cdr comm)))
 		   (push (car comm) (gethash new-list *hook-hash*)))
@@ -369,10 +373,10 @@ make sure it can be done." (every ,(third form) ,(second form))))
 	t) ; return t to stop sweep
       (change form `(intersection ,@(cdr form) :test #'eq))))
 
-     
+
          ;; K
 (defreplace zl:pkg-kill kill-package)
-	
+
 	;; L
 (defreplace	zl:lessp              <)
 (defreplace	zl:lexpr-funcall      apply)
@@ -445,7 +449,7 @@ make sure it can be done." (every ,(third form) ,(second form))))
 (deftranslation	zl:multiple-value     (form )
   (change (first form) 'multiple-value-setq)
   (dothis (third form ) form))
-	
+
 (deftranslation multiple-value-bind (form)
   (dothese (nthcdr 2 form) form))
 
@@ -492,7 +496,7 @@ make sure it can be done." (every ,(third form) ,(second form))))
 	t) ; return t to stop sweep
       (change form `(nunion ,@(cdr form) :test #'equal))))
 
-	
+
 	;; P
 (defreplace	zl:plist              symbol-plist)
 (defreplace	zl:plus               +)
@@ -580,7 +584,7 @@ make sure it can be done." (setf (get ,(second form) ,(fourth form)) ,(third for
   (change form `(nthcdr 3 ,(second form))))
 (deftranslation zl:rest4 (form)
   (change form `(nthcdr 4 ,(second form))))
-	
+
 	;; S
 
 (defreplace zl:samepnamep     string=)
@@ -596,7 +600,7 @@ make sure it can be done." (setf (get ,(second form) ,(fourth form)) ,(third for
 
 (deftranslation send (form) ;; to override the macroexpansion of send.
   (declare (ignore form))
-  nil) 
+  nil)
 
 (deftranslation zl:setplist (form)
   (change form `(setf (symbol-plist ,(second form)) ,(third form))))
@@ -641,7 +645,7 @@ make sure it can be done." (some ,(third form) ,(second form))))
 				 ((null args) l)
 			       (push (car args) l)
 			       (push (car keys) l))))))
-				       
+
 (defreplace zl:string-length length)
 (deftranslation zl:string-reverse (form)
   (change form `(reverse  (the string ,(second form)))))
@@ -783,7 +787,7 @@ make sure it can be done." (some ,(third form) ,(second form))))
 (defreplace     zl:swapf              rotatef)
 (defreplace     zl:swaphash-equal     swaphash)
 (defreplace	zl:symeval            symbol-value)
-	
+
 	;; T
 ;	terminal-io        *terminal-io*
 (deftranslation zl:throw  (form )
@@ -825,18 +829,18 @@ make sure it can be done." (some ,(third form) ,(second form))))
 		  (cons ,(second form) ,(first form)))))
 
 (deftranslation zl:xcons (form)
-  (change form `(cons ,(second form) ,(first form)))) 
+  (change form `(cons ,(second form) ,(first form))))
 
 (deftranslation si:xr-bq-append (form)
-  (when *translate-backquote* 
+  (when *translate-backquote*
     (change form `(si:grind-bq ,(si:pp-unbackquotify form)))))
 
 (deftranslation si:xr-bq-cons (form)
-    (when *translate-backquote* 
+    (when *translate-backquote*
       (change form `(si:grind-bq ,(si:pp-unbackquotify form)))))
 
 (deftranslation si:xr-bq-list (form)
-    (when *translate-backquote* 
+    (when *translate-backquote*
       (change form `(si:grind-bq ,(si:pp-unbackquotify form)))
       ))
 
@@ -845,7 +849,7 @@ make sure it can be done." (some ,(third form) ,(second form))))
     (change form `(si:grind-bq ,(si:pp-unbackquotify form)))))
 
 (deftranslation si:xr-bq-list* (form)
-    (when *translate-backquote* 
+    (when *translate-backquote*
       (change form `(si:grind-bq ,(si:pp-unbackquotify form)))))
 
 (deftranslation si:xr-bq-vector (form)
@@ -872,7 +876,7 @@ make sure it can be done." (some ,(third form) ,(second form))))
   (unless (or (floatp (second form))
 	    (floatp (if (>= (length form) 3) (third form))))
     (dothese (cdr form) form)
-    (change  form `(warning "May be you can use / or ceiling or floor or truncate if you know 
+    (change  form `(warning "May be you can use / or ceiling or floor or truncate if you know
 The type of your arguments" (quotient ,@(cdr form))))
     t))
 (defreplace     zl:%div               /)
