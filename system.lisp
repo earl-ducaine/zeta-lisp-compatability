@@ -18,3 +18,13 @@
 		 `(write-char #\> ,stream)
 		 `(format ,stream " ~X>" (%pointer ,object)))
 	    nil)))
+
+;; todo ed -- this is really needs to be translated into an entry into
+;; the pretty printing table. But that works on object types not on
+;; functions (and their return values).
+(defmacro defprint (function-name way)
+  "Defines a Way for PPrint to print a call to the function named by
+   Function-Name.  See ??? for details."
+  (if (listp way)
+      `(setf (get ',function-name ',(car way)) ',(cadr way))
+      `(setf (get ',function-name 'specially-grind) ',way)))

@@ -6,35 +6,104 @@
   (:shadow defstruct)
   (:import-from new-let nlet)
   (:export art-32b
-	   memq
+	   condition-name-handled-p
+	   defprop
 	   defstruct
 	   ferror
-	   condition-name-handled-p
-	   fquery))
+	   fquery
+	   maclisp-defun
+	   memq
+	   neq
+	   string-capitalize-words))
 
 (defpackage :system
   (:nicknames sys si)
   (:use cl primitive-zlisp)
   (:shadowing-import-from primitive-zlisp defstruct)
-  (:export printing-random-object
-	   art-32b
-	   memq
-	   *clipping-rectangle-right-edge*
+  (:export *clipping-rectangle-bottom-edge*
 	   *clipping-rectangle-left-edge*
+	   *clipping-rectangle-right-edge*
 	   *clipping-rectangle-top-edge*
-	   *clipping-rectangle-bottom-edge*
+	   *common-lisp-symbol-substitutions*
+	   *lisp-mode*
+	   *prindepth*
+	   *read-discard-font-changes*
+	   *reader-symbol-substitutions*
+	   *zetalisp-symbol-substitutions*
+	   art-32b
+	   common-lisp-on-p
+	   condition-case-throw
+	   defprint
+	   find-system-named
+	   get-source-file-name
+	   io-stream-p
+	   make-pp-obj
+	   memq
+	   merge-pathname-type
 	   mouse-x
 	   mouse-y
-	   *prindepth*
+	   pp-obj-callish
+	   pp-obj-length
+	   pp-obj-object
+	   pp-obj-type
+	   pp-objify
+	   pp-objify-comment
+	   pprint-handler
+	   printing-random-object
 	   read-discard-font-changes
-	   *lisp-mode*
-	   *reader-symbol-substitutions*
-	   *common-lisp-symbol-substitutions*
-	   io-stream-p
-	   condition-case-throw))
+	   string-capitalize-words
+	   system-files
+	   system-symbolic-name
+	   xr-list-so-far))
 
 (defpackage :ticl
-  (:use cl))
+  (:use cl)
+  (:shadow case
+	   cond
+	   declare
+	   defmacro
+	   defmethod
+	   defun
+	   do*
+	   dolist
+	   flet
+	   labels
+	   lambda
+	   let
+	   let*
+	   macro
+	   macrolet
+	   named-lambda
+	   prog
+	   prog*
+	   quote
+	   setf
+	   setq
+	   the
+	   trace)
+  (:export case
+	   cond
+	   declare
+	   defmacro
+	   defmethod
+	   defun
+	   do*
+	   dolist
+	   flet
+	   labels
+	   lambda
+	   let
+	   let*
+	   macro
+	   macrolet
+	   named-lambda
+	   prog
+	   prog*
+	   quote
+	   setf
+	   setq
+	   the
+	   trace))
 
 (defpackage :time
   (:use cl primitive-zlisp)
@@ -55,18 +124,20 @@
 	   defcom
 	   with-undo-save
 	   forward-sexp
-	   point))
+	   point
+	   set-comtab))
 
 (defpackage :compiler
   (:export
    warn))
 
 (defpackage :transl
-  (:use cl zwei)
+  (:use cl zwei primitive-zlisp)
   (:shadow warning)
   (:export translate-file
 	   translate-system
-	   condition-case-throw))
+	   condition-case-throw
+	   tr-comm))
 
 (defpackage :conditions
   (:nicknames eh)
@@ -78,3 +149,11 @@
 (defpackage :cleh
   (:use cl)
   (:export restart))
+
+
+(defpackage :file-system
+  (:use cl)
+  (:nicknames fs)
+  (:export merge-pathname-defaults
+	   read-attribute-list
+	   file-attribute-bindings))

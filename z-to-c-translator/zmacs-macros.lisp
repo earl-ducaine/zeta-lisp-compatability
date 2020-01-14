@@ -51,7 +51,7 @@
        ,@(process-command-options options)
        ,@def)))
 
-(cl-ppcre::all-matches "a" "foo bar baz")
+;; (cl-ppcre::all-matches "a" "foo bar baz")
 
 (defparameter *last-match-positions* '())
 (defparameter *last-match-strings* nil)
