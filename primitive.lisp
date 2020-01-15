@@ -359,109 +359,11 @@ RESTART-INTERACTIVE-FUNCTION is used to prompt the user for values which are
   "Returns T on valid type specifiers, NIL on any other object."
   (sb-kernel::valid-type-specifier-p type))
 
-(defun string-capitalize-words (string &optional (copy-p t) (spaces t))
-  "In STRING, turn hyphens to spaces and make each word be capitalized.
-If SPACES is NIL, hyphens are not changed.
-Copies the original string unless COPY-P is NIL, meaning mung the original."
-  (when (and (not copy-p) (stringp string))
-    (setf string (copy-sequence string)))
-  (nsubstitute-if #\Space
-		  (lambda (char)
-		    (char= char #\-))  string)
-  (format nil " ~:(~a~)" string))
-
-
-
-(defun generate-function-property-code (function-name)
-  ;;
-  (when (consp function-name)
-    (let ((name-symbol (car function-name))
-	  (property (cadr function-name)))
-      `(setf (get ,name-symbol ,property) #',name-symbol))))
-
-
-;; Taking a stab at creating a replacement for maclisp style defuns, e.g.
-;; (defun (:daemon combination-method) (my-function)
-;;     ... )
-(defmacro maclisp-defun (function-name args &body body)
-  `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (progn
-       (defun ,(if (consp funtion-name) (car function-name) function-name)
-	   ,args
-	 ,@body)
-       ,(generate-function-property-code function-name))))
-
-(defun neq (value-1 value-2)
-  (not (eq value-1 value-2)))
-
-(defmacro defprop (symbol value property)
-  "make the value of symbol's property property be value."
-  `(progn
-     (setf (get ',symbol ',property) ',value)
-     ',symbol))
-
-;; (LET-IF <COND> ((VAR-1 VAL-1) (VAR-2 VAL-2) ... (VAR-N VAL-N)) &BODY BODY)
-;; If <COND> is not nil, binds VAR-I to VAL-I (evaluated) during execution of BODY,
-;; otherwise just evaluates BODY.
-(def let-if (cond &quote var-list &rest body)
-  "Perform the bindings in var-list only if cond is non-NIL; the
-   execute the body. Aside from the presence of COND, LET-IF is just
-   like LET. The variables are always bound as specials if they are
-   bound; therefore, strictly speaking only variables declared special
-   should be used."
-  (progw (and cond var-list)
-    (eval-body-as-progn body)))
-
-
-;; (defmacro catch-error-restart ((condition format-string . format-args) &body body)
-;;   "Provide a restart for condition if signaled within body.
-;;    format-string and format-args are for the debugger to print a
-;;    description of what this restart is for, so the user can decide
-;;    whether to use it. They are all evaluated when the
-;;    catch-error-restart is entered. If the user chooses to go to the
-;;    restart we provide, catch-error-restart returns nil as first value
-;;    and a non-nil second value. If catch-error-restart is exited
-;;    normally, it returns the values of the last form in body."
-;;   (let ((tag (gensym)))
-;;     `(with-stack-list (,tag ,format-string . ,format-args)
-;;        (catch-continuation-if t ,tag
-;; 	   #'(lambda () (values nil t))
-;; 	   nil
-;;          (with-stack-list (,tag ',condition ,tag t
-;; 			   ,tag
-;; 			   'catch-error-restart-throw ,tag)
-;; 	   (with-stack-list* (eh:*condition-resume-handlers*
-;; 			      ,tag
-;; 			      eh:*condition-resume-handlers*)
-;; 	     . ,body))))))
-
-
-
-
-
-;; (define-condition food-error (error) ())
-
-
-
-;;  (define-condition bad-tasting-sundae (food-error)
-;;    ((ice-cream :initarg :ice-cream :reader bad-tasting-sundae-ice-cream)
-;;     (sauce :initarg :sauce :reader bad-tasting-sundae-sauce)
-;;     (topping :initarg :topping :reader bad-tasting-sundae-topping))
-;;    (:report (lambda (condition stream)
-;;               (format stream "Bad tasting sundae with ~S, ~S, and ~S"
-;;                       (bad-tasting-sundae-ice-cream condition)
-;;                       (bad-tasting-sundae-sauce condition)
-;;                       (bad-tasting-sundae-topping condition)))))
-
-
-
-
-
-;; (restart-case
-;;     (error 'error :report (lambda (condition stream)
-;; 			    (declare (ignore condition))
-;; 			    (format stream
-;; 				    "Leave this form untranslated and proceed with the next top-level form.")))
-;;   (my-restart (&optional v)
-;;     (declare (ignore v))
-;;     (format t "madet it here")))
+;;; Conditionally bind some special variables
+;;; This breaks down its body using UNZIP-LET-BINDINGS, defined in
+;;; /mods/controlmacro/let.lisp.
+(defmacro let-if (condition bindings &body body)
+  (multiple-value-bind (vars vals) (unzip-let-bindings bindings)
+    (alexandria:once-only (condition)
+       `(progv (if ,condition ',vars) (if ,condition (list ,@vals))
+	  ,@body))))
