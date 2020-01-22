@@ -476,7 +476,25 @@ Copies the original string unless COPY-P is NIL, meaning mung the original."
 ;;; This breaks down its body using UNZIP-LET-BINDINGS, defined in
 ;;; /mods/controlmacro/let.lisp.
 (defmacro let-if (condition bindings &body body)
+  "Perform the bindings in var-list only if cond is non-NIL; the
+   execute the body. Aside from the presence of COND, LET-IF is just
+   like LET. The variables are always bound as specials if they are
+   bound; therefore, strictly speaking only variables declared special
+   should be used."
   (multiple-value-bind (vars vals) (unzip-let-bindings bindings)
     (alexandria:once-only (condition)
        `(progv (if ,condition ',vars) (if ,condition (list ,@vals))
 	  ,@body))))
+
+
+;; (LET-IF <COND> ((VAR-1 VAL-1) (VAR-2 VAL-2) ... (VAR-N VAL-N)) &BODY BODY)
+;; If <COND> is not nil, binds VAR-I to VAL-I (evaluated) during execution of BODY,
+;; otherwise just evaluates BODY.
+;; (def let-if (cond &quote var-list &rest body)
+;;   "Perform the bindings in var-list only if cond is non-NIL; the
+;;    execute the body. Aside from the presence of COND, LET-IF is just
+;;    like LET. The variables are always bound as specials if they are
+;;    bound; therefore, strictly speaking only variables declared special
+;;    should be used."
+;;   (progw (and cond var-list)
+;;     (eval-body-as-progn body)))

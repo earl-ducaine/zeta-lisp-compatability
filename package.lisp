@@ -1,5 +1,12 @@
 
 
+(defpackage :asdf-helper
+  (:use cl)
+  (:export system-files))
+
+(defpackage :global
+  (:use cl)
+  (:export format))
 
 (defpackage :primitive-zlisp
   (:use cl)
@@ -54,6 +61,7 @@
 	   string-capitalize-words
 	   system-files
 	   system-symbolic-name
+	   zetalisp-on-p
 	   xr-list-so-far))
 
 (defpackage :ticl
@@ -118,14 +126,15 @@
 	   defstruct))
 
 (defpackage :zwei
-  (:use cl primitive-zlisp cl-utilities)
+  (:use cl primitive-zlisp global)
   (:shadowing-import-from primitive-zlisp defstruct)
-  (:export skip-over-blank-lines-and-comments
+  (:export barf
 	   defcom
-	   with-undo-save
 	   forward-sexp
 	   point
-	   set-comtab))
+	   set-comtab
+	   skip-over-blank-lines-and-comments
+	   with-undo-save))
 
 (defpackage :compiler
   (:export
@@ -134,6 +143,7 @@
 (defpackage :transl
   (:use cl zwei primitive-zlisp)
   (:shadow warning)
+  (:import-from si zetalisp-on-p)
   (:export translate-file
 	   translate-system
 	   condition-case-throw

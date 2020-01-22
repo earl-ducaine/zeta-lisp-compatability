@@ -1,6 +1,8 @@
 
 (in-package :transl)
 
+(defun str (&rest rest)
+  (apply #'concatenate 'string rest))
 
 ;; (proclaim '(optimize (safety 0) (speed 3)))
 
@@ -31,14 +33,18 @@
 			  (zwei::interval-last-bp zwei::*interval*) t t)
 	 (zwei::com-forward-sexp)))
 
+(defvar si:*read-discard-font-changes*)
+(defvar si:*lisp-mode*)
+(defvar zwei::*window*)
+
 ;; The change-occured check avoids all the grinding lossage if there
 ;; are no changes. The with-undo-save means that one can answer Y and
 ;; still go back to the original with a single UNDO.
 (hemlock-internals:defcommand ("Translate Next Sexp" com-translate-next-sexp)  (p)
     "Translate Next Sexp in Buffer"
     "Translate Next Sexp in Buffer"
-  (let((context nil)
-       (trace nil)
+  (let((*context* nil)
+       (*trace* nil)
        (change-occured nil)
        (*translate-backquote* nil))
     ;;(declare (special context trace change-occured))
@@ -46,11 +52,17 @@
     ;; phd 3/15/86 #(1 2 3) will be printed correctly
     (let* ((*print-array* t)
 	   (stream (stream-out-next-expression))
-	   (form (let ((*readtable* (if (zetalisp-on-p )
-					tr-read
-					tr-cl-read))
-		       (si:READ-DISCARD-FONT-CHANGES nil ))
-		   (read  stream nil '*EOF* nil nil t))))
+	   (form (let (;; We don't (although we could have) a zetalisp
+		       ;; readtable.
+		       ;;
+		       ;; (*readtable* (if (zetalisp-on-p )
+		       ;; 			tr-read
+		       ;; 			tr-cl-read))
+		       (si:*read-discard-font-changes* nil))
+		   ;; Final item is discard open parens (t), which
+		   ;; isn't an option in the ANSI CL reader.
+		   ;; (read  stream nil '*EOF* nil nil t)
+		   (read  stream nil '*EOF*))))
       (if (or (null form)
 	      (EQ FORM '*EOF*))
 	  (zwei::BARF "there is no form to translate ; position the cursor at the beginning of a form")
@@ -64,35 +76,44 @@
 		   (zwei:with-undo-save ("Translation" (zwei:forward-sexp (zwei:point) -1) (zwei:point) t)
 		     (let ((*readtable* #.*readtable*)
 			   (si:*lisp-mode* :common-lisp)
-			   (si:*READER-SYMBOL-SUBSTITUTIONS* si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
+			   (si:*reader-symbol-substitutions* si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
 		       (pprint form  (zwei::INTERVAL-STREAM-INTO-BP (ZWei::point) t)))
 		     (zwei::must-redisplay zwei::*window* zwei::dis-text)
 		     (zwei::redisplay zwei::*window* )
 		     (if (y-or-n-p "Is this ok?")
 			 (progn
-			   (zwei::com-backward-kill-sexp)
-			   (zwei::com-kill-line)
-			   (zwei::com-forward-sexp))
-			 (zwei::com-kill-sexp))))))))
+			   (hemlock::backward-kill-form-command)
+			   (hemlock::kill-line-command)
+			   (hemlock::forward-form-command))
+			 (hemlock::forward-kill-form-command))))))))
     zwei::dis-text))
 
-(zwei:defcom com-translate-next-sexp-including-backquotes  "" ()
-  (let((context nil)
-       (trace nil)
+(hemlock-internals:defcommand ("Translate Next Sexp Including Backquotes"
+			       com-translate-next-sexp-including-backquotes)  (p)
+    "Translate Next Sexp Including Backquotes"
+    "Translate Next Sexp Including Backquotes"
+  (declare (ignore p))
+  (let((*context* nil)
+       (*trace* nil)
        (change-occured nil)
        (*translate-backquote* t))
-    (declare (special context trace change-occured))
     (clrhash *hook-hash*)
-    (let* ((*print-array* t) ;phd 3/15/86 #(1 2 3) will be printed correctly
+    ;; phd 3/15/86 #(1 2 3) will be printed correctly
+    (let* ((*print-array* t)
 	   (stream (stream-out-next-expression))
-	   (form (let ((*readtable* (if (zetalisp-on-p )
+	   (form (let ((*readtable* (if (zetalisp-on-p)
 					tr-read
 					tr-cl-read))
-		       (si:READ-DISCARD-FONT-CHANGES nil ))
-		   (read  stream nil '*EOF* nil nil t))))
+		       (si:*read-discard-font-changes* nil ))
+		   ;; the final argument in zetalisp indicates that
+		   ;; read should ignore unmatched trailing right
+		   ;; parens. Doesn't exist in ansi CL.
+		   ;;(read  stream nil '*EOF* nil nil t)
+		   (read  stream nil '*eof*))))
       (if (or (null form)
-	      (EQ FORM '*EOF*))
-	  (zwei::BARF "there is no form to translate ; position the cursor at the beginning of a form")
+	      (eq form '*eof*))
+	  (zwei::BARF (str "there is no form to translate ; "
+			   "position the cursor at the beginning of a form"))
 	  (progn
 	    (translate-form form nil)
 	    (transpose-package form)
@@ -109,12 +130,11 @@
 		     (zwei::redisplay zwei::*window* )
 		     (if (y-or-n-p "Is this ok?")
 			 (progn
-			   (zwei::com-backward-kill-sexp)
-			   (zwei::com-kill-line)
-			   (zwei::com-forward-sexp))
-			 (zwei::com-kill-sexp))))))))
+			   (hemlock::backward-kill-form-command)
+			   (hemlock::kill-line-command)
+			   (hemlock::forward-form-command))
+			 (hemlock::forward-kill-form-command))))))))
     zwei::dis-text))
-
 
 ;; (zwei:defcom com-install-translator-key
 ;; 	     "Install the Hyper-T key in the current comtab" ()
@@ -128,10 +148,9 @@
     "Install Translate on Hyper-T"
     "Install Translate on Hyper-T"
     (declare (ignore p))
-    (hemlock-interface:bind-key "Select Random Typeout Buffer" #k"hyper-T"
-				com-translate-next-sexp)
-  (hemlock-interface:bind-key "Select Random Typeout Buffer" #k"hyper-super-T"
-			      com-translate-next-sexp-including-backquotes))
+    (hemlock-interface:bind-key "Translate Next Sexp" #k"hyper-T")
+    (hemlock-interface:bind-key "Translate Next Sexp Including Backquotes"
+				#k"hyper-super-T"))
 
 (si:defprint transl:tr-comm (si:pprint-handler si:pp-objify-comment))
 
@@ -144,26 +163,34 @@
 ;;  1/05/89 DNG - Avoid possibility of doing the defsystem file twice.
 ;;  1/14/89 DNG - Use keyword arguments.
 (defun translate-system (system-name output-directory
-			 &key (trace nil) base (case *print-case*) (radix *print-radix*))
+			 &key
+			   (trace nil)
+			   base
+			   (case *print-case*)
+			   (radix *print-radix*))
   "Translates all of the files in a system from Zetalisp to Common Lisp.
-The first argument is the name of the system, and the second is the pathname
-of the directory where the translated files are to be written.
-TRACE set to T will cause all changes to be printed out on *STANDARD-OUTPUT*
-BASE indicates the print base of the translator, NIL means use the file's base.
-CASE is the value for *PRINT-CASE* -- either :UPCASE or :DOWNCASE.
-RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on numbers."
-  (let* ((files (sys:system-files system-name '(:recompile :do-not-do-components)
+   The first argument is the name of the system, and the second is the
+   pathname of the directory where the translated files are to be
+   written. trace set to t will cause all changes to be printed out on
+   *standard-output* base indicates the print base of the translator,
+   nil means use the file's base. case is the value for *print-case*
+   -- either :upcase or :downcase. radix is the value for
+   *print-radix* -- true to include explicit radix on numbers."
+  (let* ((files (asdf-helper:system-files system-name
+				  ;; todo -- Currently system returns
+				  ;; all components. We should control
+				  ;; by filter at some time
+				  '(:recompile :do-not-do-components)
 				  '(:compile :readfile)))
-	 (system (sys:find-system-named system-name t t))
+	 (system (asdf:find-system system-name t t))
 	 (ofiles '()))
     (unless (null system)
-      (pushnew (sys:merge-pathname-type (sys:get-source-file-name (sys:system-symbolic-name system)
-								  'DEFSYSTEM)
-					:LISP)
-	       files :test #'eq))
+      (pushnew (asdf/system::system-source-file system)
+	       files :test #'equal))
     (dolist (file files)
-      (with-simple-restart (nil
-			    "Give up translating file \"~A\" and continue with the next one." file)
+      (with-simple-restart
+	  (nil
+	   "Give up translating file \"~A\" and continue with the next one." file)
 	(when trace
 	  (format t "~2%  ===  Translating file ~A  ===~%" file))
 	(push (let ((*print-radix* radix))
@@ -176,9 +203,9 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
   (do ((sexp exp (cdr sexp) ))
       ((atom sexp))
     (if (symbolp (car sexp))
-	(when (rASSOC (CAR sexp)
-		     SI:*zetalisp-SYMBOL-SUBSTITUTIONS*
-		     :TEST #'EQ)
+	(when (rassoc (car sexp)
+		     si:*zetalisp-symbol-substitutions*
+		     :test #'eq)
 	  (setf change-occured t)
 	  (return))
 	(find-incompatible-symbol (car sexp)))))
@@ -276,7 +303,10 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 	(push form context)
 	(do ((sub-forms (cdr form) (if (consp sub-forms ) (cdr sub-forms) nil)))
 	    ((null sub-forms))
-	  (translate-form (if (consp sub-forms) (car sub-forms) sub-forms) context)))))
+	  (translate-form (if (consp sub-forms)
+			      (car sub-forms)
+			      sub-forms)
+			  context)))))
 
 (defun nlam ()
   t)
@@ -384,22 +414,18 @@ RADIX is the value for *PRINT-RADIX* -- true to include explicit radix on number
 ;;   `(defmacro ,name (&body body)
 ;;      `(,newname ,@body)))
 
-
 ;; (defmacro p-defgeneric-options (&body body)
 ;;   `(defgeneric ,@body))
 
-
-(p-defgeneric-options
- add-method
- ((generic-function
-   (if (typep generic-function 'generic-function)
-       generic-function
-       (get-generic-function-object generic-function)))
-  method)
- (:documentation "Add a method to a generic function.
-The generic function is destructively modified and returned as the result."))
-
-
+;; (p-defgeneric-options
+;;  add-method
+;;  ((generic-function
+;;    (if (typep generic-function 'generic-function)
+;;        generic-function
+;;        (get-generic-function-object generic-function)))
+;;   method)
+;;  (:documentation "Add a method to a generic function.
+;; The generic function is destructively modified and returned as the result."))
 
 
 ;; This function tries to hook the comments to the form that precedes them
@@ -429,7 +455,7 @@ The generic function is destructively modified and returned as the result."))
   (let ((char (read-char st)))
     (if (eq ':toplevel si:xr-list-so-far)
 	;; create the font change symbol
-	(values (intern (string-append #.(string '|epsilon|) char)))
+	(values (intern (str #.(string '|epsilon|) char)))
 	(let* ((len (if (listp  si:xr-list-so-far)
 			(length si:xr-list-so-far)
 			1))
@@ -441,16 +467,17 @@ The generic function is destructively modified and returned as the result."))
 		     (acons len (list char) (gethash si:xr-list-so-far *hook-hash* ))))
 	  (values )))))
 
-;;;PHD 6/26/86 Added support for #. and #,
-;;;The form following #. or #, is translated upon reading (see tranlate-sharp-dot).
-;;;The pprinter is handling sharp-dot and sharp-comma to print them back as #. and #,
-;;;Note the translation handlers for sharp-dot and sharp-comma, they are there to prevent
-;;;a second translation during  the translation pass.
-;;;Note that we have to translate  during reading because #. can be found anywhere, like
-;;;inside a quoted expression.
+;;; PHD 6/26/86 Added support for #. and #, The form following #. or
+;;; #, is translated upon reading (see tranlate-sharp-dot).  The
+;;; pprinter is handling sharp-dot and sharp-comma to print them back
+;;; as #. and #, Note the translation handlers for sharp-dot and
+;;; sharp-comma, they are there to prevent a second translation during
+;;; the translation pass. Note, we have to translate during
+;;; reading because #. can be found anywhere, like inside a quoted
+;;; expression.
 (defun translate-sharp-dot (st char ignore)
   (declare (ignore ignore))
-  `(,(case (int-char char)
+  `(,(case (code-char char)
        (#\. 'sharp-dot)
        (#\, 'sharp-comma))
     ,(let ((exp (read st t nil t)))
@@ -467,32 +494,45 @@ The generic function is destructively modified and returned as the result."))
   (nlam))
 
 ;; 12/08/88 DNG - Added LOCATION argument.
+
+;; todo -- stub out for the moment, until we have an example we can
+;; study in detail.
+;; (defun pp-objify-sharp-dot  (object location currlevel)
+;;   (let ((argument (si:pp-objify (cadr object) location currlevel))
+;; 	(sharp (si:make-pp-obj :type 'string :length 2 :object "#." :location location)))
+;;       (si:make-pp-obj :type 'complex
+;; 		   :length (+ (si:pp-obj-length argument) 2)
+;; 		   :object (cons sharp
+;; 				 (if (eq (si:pp-obj-type argument) 'complex)
+;; 				     (si:pp-obj-object argument)
+;; 				     (list argument)))
+;; 		   :callish (si:pp-obj-callish argument)
+;; 		   :location location)))
 (defun pp-objify-sharp-dot  (object location currlevel)
-  (let ((argument (si:pp-objify (cadr object) location currlevel))
-	(sharp (si:make-pp-obj :type 'string :length 2 :object "#." :location location)))
-      (si:make-pp-obj :type 'complex
-		   :length (+ (si:pp-obj-length argument) 2)
-		   :object (cons sharp
-				 (if (eq (si:pp-obj-type argument) 'complex)
-				     (si:pp-obj-object argument)
-				     (list argument)))
-		   :callish (si:pp-obj-callish argument)
-		   :location location)))
+  (declare (ignore object location currlevel)))
+
+
+;; todo -- stub out for the moment, until we have an example we can
+;; study in detail.
+;; (defun pp-objify-sharp-comma  (object location currlevel)
+;;   (let ((argument (si:pp-objify (cadr object) location currlevel))
+;; 	(sharp (si:make-pp-obj :type 'string :length 2 :object "#," :location location)))
+;;       (si:make-pp-obj :type 'complex
+;; 		   :length (+ (si:pp-obj-length argument) 2)
+;; 		   :object (cons sharp
+;; 				 (if (eq (si:pp-obj-type argument) 'complex)
+;; 				     (si:pp-obj-object argument)
+;; 				     (list argument)))
+;; 		   :callish (si:pp-obj-callish argument)
+;; 		   :location location)))
 (defun pp-objify-sharp-comma  (object location currlevel)
-  (let ((argument (si:pp-objify (cadr object) location currlevel))
-	(sharp (si:make-pp-obj :type 'string :length 2 :object "#," :location location)))
-      (si:make-pp-obj :type 'complex
-		   :length (+ (si:pp-obj-length argument) 2)
-		   :object (cons sharp
-				 (if (eq (si:pp-obj-type argument) 'complex)
-				     (si:pp-obj-object argument)
-				     (list argument)))
-		   :callish (si:pp-obj-callish argument)
-		   :location location)))
+  (declare (ignore object location currlevel)))
 
+;; todo -- stub out pprinting stuff until we have a concrete example
+;; of how it's used
+;; (si:defprint sharp-dot  (si:pprint-handler pp-objify-sharp-dot))
+;; (si:defprint sharp-comma  (si:pprint-handler pp-objify-sharp-comma))
 
-(si:defprint sharp-dot  (si:pprint-handler pp-objify-sharp-dot))
-(si:defprint sharp-comma  (si:pprint-handler pp-objify-sharp-comma))
 (set-dispatch-macro-character  #\# #\. 'translate-sharp-dot  tr-read)
 (set-dispatch-macro-character  #\# #\, 'translate-sharp-dot  tr-read)
 (set-dispatch-macro-character  #\# #\. 'translate-sharp-dot  tr-cl-read)
@@ -501,26 +541,38 @@ The generic function is destructively modified and returned as the result."))
 
 ;(set-syntax-from-char (char-int #\/) (char-int #\\) tr-read)
 
-(SET-MACRO-CHARACTER #\; #'read-comment nil tr-read) ; notice the bug in set-macro-character
-(SET-MACRO-CHARACTER '|epsilon| 'read-font-change nil tr-read) ; notice the bug in set-macro-character
-(SET-MACRO-CHARACTER #\; #'read-comment nil tr-cl-read) ; notice the bug in set-macro-character
-(SET-MACRO-CHARACTER '|epsilon| 'read-font-change nil tr-cl-read) ; notice the bug in set-macro-character
+;; notice the bug in set-macro-character
+(set-macro-character #\; #'read-comment nil tr-read)
 
-(SET-DISPATCH-MACRO-CHARACTER  #\# #\/
-			      (GET-DISPATCH-MACRO-CHARACTER
+;; ed: doubtful this is thiss the case: notice the bug in set-macro-character
+;; todo (ed) -- another example of case that we don't know how to handle
+;; and that we'll need a contcrete example of to properly implement.
+;; (set-macro-character '|epsilon| 'read-font-change nil tr-read)
+
+;; notice the bug in set-macro-character
+(set-macro-character #\; #'read-comment nil tr-cl-read)
+
+;; ed: doubtful this is thiss the case: notice the bug in set-macro-character
+;; todo (ed) -- another example of case that we don't know how to handle
+;; and that we'll need a contcrete example of to properly implement.
+;; (set-macro-character '|epsilon| 'read-font-change nil tr-cl-read)
+
+(set-dispatch-macro-character  #\# #\/
+			      (get-dispatch-macro-character
 				 #\# #\\
-				si::common-lisp-readtable)
+				si::*common-lisp-readtable*)
 			      tr-read)
+
 (SET-DISPATCH-MACRO-CHARACTER #\#  #\\
 			      (GET-DISPATCH-MACRO-CHARACTER
 				 #\# #\\
-				si::common-lisp-readtable)
+				si::*common-lisp-readtable*)
 			      tr-read)
 
 #-elroy
-(DEFUN GRIND-COMMENT (EXP LOC)
+(defun grind-comment (exp loc)
   (declare (ignore loc))
-  (si::GRIND-FORM (second EXP) (LOCF (second EXP)))
+  (si::grind-form (second exp) (locf (second exp)))
   (loop for i in (nthcdr 2 exp) do
        (si::gtyo 59)
        (si::gstring i (locf i))
