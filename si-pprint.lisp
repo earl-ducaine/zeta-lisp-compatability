@@ -114,3 +114,38 @@
 	   :right-margin grind-width
 	   )
 	   (values)))
+
+(defun grind-form (bp1 bp2 &optional outstream (width nil))
+  "Grinds a form found between BP1 and BP2 into the output stream outstream.
+   Width is the max width for the output stream."
+  (with-function-trapped (barf)
+    (let ((bp2* (copy-bp bp2)))
+      ;; (print bp1)
+      ;; (print bp2)
+      (set-up-by-untabifying bp1 bp2)
+      ;; (print bp1)
+      ;; (print bp2)
+      (let ((stream1 (interval-stream bp1 bp2* t))
+            (stream2 (interval-stream bp1 bp2* t :read-char)))
+        (unwind-protect
+	     ;; RDA Does this really want to be here?
+	     ;;              (catch-error
+             (let ((forms (read-forms stream1))
+                   (real-width (floor (/ width (tv:font-char-width
+                                                (send *window*
+                                                      :current-font))))))
+               (let ((string (with-output-to-string (*standard-output*)
+                               (loop for form in forms do
+                                    (grind-top-level
+                                     form (- real-width (bp-index bp1))))))
+                     (left-margin (bp-index bp1)))
+		 ;; (princ string)
+		 ;; (zwei:with-undo-save ("Regrind region." bp1 bp2* t)
+                 (grind-form-2 bp1 bp2* outstream stream2 string
+                               left-margin (- real-width left-margin)
+                               forms)))
+	  ;; nil
+          (close stream1)
+	  ;; RDA: changed "stream1" to "stream2"
+          (close stream2)
+	  )))))

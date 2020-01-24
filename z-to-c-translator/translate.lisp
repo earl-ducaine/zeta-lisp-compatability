@@ -17,21 +17,30 @@
 ;; phd 4/15/86 added support for backquote translation
 (defvar  *translate-backquote* nil)
 
-(use-package 'zwei)
-
 (defmacro warning (text body)
-  (compiler:warn 'translation-warning :ignorable-mistake text)
+  (warn "~s ~s ~s" 'translation-warning :ignorable-mistake text)
   body)
 
 (defvar zwei::*interval*)
+
+
+;; hemlock command "Forward Form"
 
 ;; The change in this function skips over blank and comment lines
 ;; before starting to read the next s-expression.
 (defun stream-out-next-expression ()
   "Return a stream for the next s-expression and advance point"
-  (prog1 (zwei::interval-stream (zwei:skip-over-blank-lines-and-comments (zwei::point))
-			  (zwei::interval-last-bp zwei::*interval*) t t)
-	 (zwei::com-forward-sexp)))
+  ;; 1. mark current cursor: mark1
+  ;; 2. forward-form-command
+  ;; 3. get ending mark mark2
+  ;; 4. (make-string-input-stream (region-to-string (region mark1 mark2)))
+  ;;
+  ;; Old code
+  ;; (make-string-input-stream)
+  ;; (prog1 (zwei::interval-stream (zwei:skip-over-blank-lines-and-comments (zwei::point))
+  ;; 			  (zwei::interval-last-bp zwei::*interval*) t t)
+  ;; 	 (zwei::com-forward-sexp))
+  )
 
 (defvar si:*read-discard-font-changes*)
 (defvar si:*lisp-mode*)
@@ -78,7 +87,10 @@
 		   (zwei:with-undo-save
 		       ("Translation" (zwei:forward-sexp (zwei:point) -1)
 				      (zwei:point) t)
-		     (let ((*readtable* #.*readtable*)
+		     ;; Not clear what this is attemptir to do: my
+		     ;; ignorance of the reader #. macro.
+		     ;; (let ((*readtable* #.*readtable*)
+		     (let ((*readtable* *readtable*)
 			   (si:*lisp-mode* :common-lisp)
 			   (si:*reader-symbol-substitutions*
 			    si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
@@ -131,7 +143,9 @@
 		   (zwei:with-undo-save
 		       ("Translation" (zwei:forward-sexp (zwei:point) -1)
 				      (zwei:point) t)
-		     (let ((*readtable* #.*readtable*)
+		     ;; See above not on why the orriginal of this
+		     ;; confused me.
+		     (let ((*readtable* *readtable*)
 			   (si:*lisp-mode* :common-lisp)
 			   (si:*READER-SYMBOL-SUBSTITUTIONS*
 			    si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS*))
@@ -184,71 +198,80 @@
   the file's base.  case should be either :upcase or :downcase."
   (let ((*trace* trace)
 	(eof (cons nil nil))
-	(cl-readtable #.*readtable*))
-    (setq ifile (fs:merge-pathname-defaults ifile :lisp))
-    (setq ofile (fs:merge-pathname-defaults ofile ifile))
+	;; See my note below on my confusion on the #.*readtable*
+	;; form, what was originally here.
+	(cl-readtable *readtable*))
+    ;; Unlike in lm we assume these are already in stream friendly
+    ;; forms.
+    ;; (setq ifile (merge-pathnames ifile :lisp))
+    ;; (setq ofile (merge-pathnames ofile ifile))
     (clrhash *hook-hash*)
     (with-open-file (is ifile :direction :input)
       (with-open-file (os ofile :direction :output :if-exists :new-version)
-	(let ((generic-pathname  (funcall ifile ':generic-pathname)))
-	  (fs:read-attribute-list generic-pathname is)
-	  (multiple-value-bind (vars vals)
-	      (fs:file-attribute-bindings generic-pathname)
-	    (progv vars vals
-	      (let ((si:*read-discard-font-changes* nil )
-		    (*translate-backquote* nil)
-		    (context nil)
-		    (*print-base* (or new-base *print-base*)))
-		(declare (special context))
-		(unless (and (sys:common-lisp-on-p)
-			     (eql *read-base* *print-base*))
-		  (format os ";;; -*- Mode: Lisp; Syntax: Common-Lisp; Package: ~A; Base: ~D -*-~%"
-			  (package-name *package*) *print-base*))
-		(loop
-		   (if (char= (let ((char (peek-char nil is nil eof)))
-				(if (eq char eof )
-				    (return nil)
-				    char)) #\( )
-		       (let (exp (change-occured nil))
-			 (declare (special change-occured))
-			 (let* ((*readtable* (if (zetalisp-on-p )
-						 tr-read
-						 tr-cl-read)))
-
-			   ;; The final argument in zetalisp indicates
-			   ;; that read should ignore unmatched
-			   ;; trailing right parens. Doesn't existe in
-			   ;; ansi CL.
-			   ;; (setf exp (read is nil EOF nil nil t))
-			   (setf exp (read is nil EOF nil))
-			   (when (eq exp eof )
-			     (return nil)))
-			 (with-simple-restart
-			     (translation-error
-			      (str "Leave this form untranslated and proceed "
-				   "with the next top-level form."))
-			 ;; (catch-error-restart
-			 ;;  ((error break)
-			 ;;   (str "Leave this form untranslated and proceed "
-			 ;; 	"with the next top-level form."))
-			   (translate-form exp nil))
-			 (transpose-package exp)
-			 (splice-comment exp)
-			 (let ((*readtable* cl-readtable)
-			       (si:*reader-symbol-substitutions*
-				si:*common-lisp-symbol-substitutions*)
-			       ;; phd 3/15/86 #(1 2 3) will be printed correctly
-			       (*print-array* t)
-			       (*print-structure* t)
-			       (*print-length* nil)
-			       (*print-level* nil)
-			       (*print-case* case))
-			   (pprint  exp os)))
-		       (write-line (let ((line (read-line is nil eof)))
-				     (if (eq line  eof)
-					 (return nil)
-					 line))
-				   os)))))))
+	;;(let ((generic-pathname  (funcall ifile ':generic-pathname)))
+	;; (fs:read-attribute-list generic-pathname is)
+	;; Not clear what this is supoosod to do. Is progv vars vals
+	;; an unzipped variable value list?
+	;;
+	;; (multiple-value-bind (vars vals)
+	;;     (fs:file-attribute-bindings generic-pathname)
+	;;   (progv vars vals
+	(let ((si:*read-discard-font-changes* nil )
+	      (*translate-backquote* nil)
+	      (context nil)
+	      (*print-base* (or new-base *print-base*)))
+	  (declare (special context))
+	  ;; We don't use modeline
+	  ;; (unless (and (sys:common-lisp-on-p)
+	  ;; 	     (eql *read-base* *print-base*))
+	  ;;   (format os (str ";;; -*- Mode: Lisp; Syntax: Common-Lisp; "
+	  ;; 		  "Package: ~A; Base: ~D -*-~%")
+	  ;; 	  (package-name *package*) *print-base*))
+	  (loop
+	     (if (char= (let ((char (peek-char nil is nil eof)))
+			  (if (eq char eof )
+			      (return nil)
+			      char)) #\( )
+		 (let (exp (change-occured nil))
+		   (declare (special change-occured))
+		   (let* ((*readtable* (if (zetalisp-on-p )
+					   tr-read
+					   tr-cl-read)))
+		     ;; The final argument in zetalisp indicates
+		     ;; that read should ignore unmatched
+		     ;; trailing right parens. Doesn't existe in
+		     ;; ansi CL.
+		     ;; (setf exp (read is nil EOF nil nil t))
+		     (setf exp (read is nil EOF nil))
+		     (when (eq exp eof )
+		       (return nil)))
+		   (with-simple-restart
+		       (translation-error
+			(str "Leave this form untranslated and proceed "
+			     "with the next top-level form."))
+		     ;; (catch-error-restart
+		     ;;  ((error break)
+		     ;;   (str "Leave this form untranslated and proceed "
+		     ;; 	"with the next top-level form."))
+		     (translate-form exp nil))
+		   (transpose-package exp)
+		   (splice-comment exp)
+		   (let ((*readtable* cl-readtable)
+			 (si:*reader-symbol-substitutions*
+			  si:*common-lisp-symbol-substitutions*)
+			 ;; phd 3/15/86 #(1 2 3) will be printed correctly
+			 (*print-array* t)
+			 (*print-structure* t)
+			 (*print-length* nil)
+			 (*print-level* nil)
+			 (*print-case* case))
+		     (pprint  exp os)))
+		 (write-line (let ((line (read-line is nil eof)))
+			       (if (eq line  eof)
+				   (return nil)
+				   line))
+			     os))))
+	;; ))
 	(truename os)))))
 
 ;; 12/08/88 DNG - Original version.
@@ -305,6 +328,7 @@
 ;; It seems the right thing to do is to always return true, i.e. not a
 ;; macro compiled program
 (defmacro check-for-fef-area (object)
+  (declare (ignore object))
   t)
   ;; `(/= macro-compiled-program
   ;;      (sys:%area-number ,object)))
@@ -321,17 +345,17 @@
 		  ((atom sexp))
 		(if (symbolp (car sexp))
 		    (when  (and (setf new-sym
-				 (car (rASSOC (CAR sexp)
-					     SI:*zetalisp-SYMBOL-SUBSTITUTIONS*
-					     :TEST #'EQ)))
+				 (car (rassoc (car sexp)
+					     si:*zetalisp-symbol-substitutions*
+					     :test #'eq)))
 				(check-for-fef-area sexp))
 		      (setf (car sexp) new-sym ))
 		    (transpose-package (car sexp)))
 		(if (symbolp (cdr sexp))
 		    (when  (and (setf new-sym
-				 (car (rASSOC (cdr sexp)
-					     SI:*zetalisp-SYMBOL-SUBSTITUTIONS*
-					     :TEST #'EQ)))
+				 (car (rassoc (cdr sexp)
+					     si:*zetalisp-symbol-substitutions*
+					     :test #'eq)))
 				(check-for-fef-area sexp))
 		      (setf (cdr sexp) new-sym )))))))
     (otherwise nil)))
@@ -366,7 +390,9 @@
 	     *context*)
     (let ((*print-length* 3)
 	  (*print-level* 2)
-	  (*readtable* #.*readtable*))
+	  ;; Todo -- See above for info on why the original, #.*readtable*
+	  ;; confused me.
+	  (*readtable* *readtable*))
       (format *standard-output* "~%In ~S~%	 ~S => ~S"
 	      (car (last *context*)) form exp))))
 
@@ -520,23 +546,30 @@
 ;; The generic function is destructively modified and returned as the result."))
 
 
-;; This function tries to hook the comments to the form that precedes them
-;; in the context of a top level form
-;; (gethash top-level-form *hook-hash* ) is an alist which key is the element number of the form in the top-level form
-;; and contents is a list of comments that were after that form
-;; The problem is if the top-level-form begins with a comment, that one is hooked to nil instead of the top-level-form
-(defun read-comment ( st char)
+;; This function tries to hook the comments to the form that precedes
+;; them in the context of a top level form (gethash top-level-form
+;; *hook-hash* ) is an alist which key is the element number of the
+;; form in the top-level form and contents is a list of comments that
+;; were after that form The problem is if the top-level-form begins
+;; with a comment, that one is hooked to nil instead of the
+;; top-level-form
+(defun read-comment (st char)
   (declare (ignore char))
   (let ((string (read-line st)))
     (case  si:xr-list-so-far
 	   (:toplevel
-	    (values )) ;`(tr-comm ,string))) temporary fix until I figure out something better.(PHD 9/4)
+	    (values ))
+	   ;; Temporary fix until I figure out something better.(PHD 9/4)
+	   ;; `(tr-comm ,string)))
 	   (:after-dot
 	    (values ))
 	   (otherwise
 	    (let* ((len (length si:xr-list-so-far))
-		   (place (cdr (assoc len (gethash si:xr-list-so-far *hook-hash* ) :test #'eq))))
-	      ; if there is already a comment push this one at the end of the list
+		   (place (cdr (assoc len
+				      (gethash si:xr-list-so-far *hook-hash*)
+				      :test #'eq))))
+	      ;; if there is already a comment push this one at the
+	      ;; end of the list
 	      (if place (rplacd (last place ) (list  string ))
 		  (setf (gethash si:xr-list-so-far *hook-hash* )
 			(acons len (list string) (gethash si:xr-list-so-far *hook-hash* ))))
@@ -655,21 +688,31 @@
 				si::*common-lisp-readtable*)
 			      tr-read)
 
-(SET-DISPATCH-MACRO-CHARACTER #\#  #\\
-			      (GET-DISPATCH-MACRO-CHARACTER
+(set-dispatch-macro-character #\#  #\\
+			      (get-dispatch-macro-character
 				 #\# #\\
 				si::*common-lisp-readtable*)
 			      tr-read)
 
-#-elroy
+
 (defun grind-comment (exp loc)
   (declare (ignore loc))
-  (si::grind-form (second exp) (locf (second exp)))
+  (si::grind-form (second exp)
+		  ;; todo -- locf retrieves the pointer of the
+		  ;; object. I believe in this case it's the notify
+		  ;; function for the stream.  we'll just assume the
+		  ;; object itself is usable, i.e. sort it out later.
+		  ;;(locf (second exp))
+		  (cadr (second exp)))
   (loop for i in (nthcdr 2 exp) do
        (si::gtyo 59)
-       (si::gstring i (locf i))
+       (si::gstring i
+		    ;; See above comment on locf.
+		    ;; (locf i)
+		    i)
        (funcall si::grind-io :fresh-line)))
 
+(defvar si::grind-io)
 
 (defun splice-comment (form)
   (when (consp form)
@@ -735,6 +778,7 @@
 		     (CONSP (CdAR sub-forms)))
 	    (dothis (second (CAR sub-forms)) sub-forms)))
   (dothese (cdddr form) form))
+
 (deftranslation defsubst (form) (dothese (cdddr form) form))
 (deftranslation ticl:defmethod (form) (dothese (cdddr form ) form))
 (deftranslation ticl:declare  (form )
@@ -742,14 +786,19 @@
   (if (null context) ;; we are at top level so replace by proclaim
       (change form `(proclaim ',@(cdr form))))
   t) ;stop the sweep
-(deftranslation ticl:the (form) (dothis (third form)form)) ; first approximation
+
+;; first approximation
+(deftranslation ticl:the (form) (dothis (third form)form))
 (deftranslation ticl:lambda (form) (dothese (cddr form) form))
 (deftranslation ticl:macro (form) (dothese (cdddr form) form))
+
 (deftranslation ticl:case (form)
   (dothis (second form) form)
   (loop for i in (cddr form)
-	do (dothese (cdr i) form))
-  t) ;stop the sweep
+     do (dothese (cdr i) form))
+  ;; stop the sweep
+  t)
+
 (deftranslation ticl:cond (form)
   (loop for i in (cdr form) do (dothese i form))
   t)
@@ -761,7 +810,7 @@
   (dothese (nthcdr 3 form)form))
 
 (deftranslation ticl:dolist (form)
-  (dothese (cdr-safe (cadr-safe form)) form)
+  (dothese (cdr (cadr form)) form)
   (dothese (nthcdr 2 form) form))
 
 (deftranslation ticl:prog (form)
@@ -769,14 +818,14 @@
 	   ;; Will look for tags in the body of a prog.
 	   (do ((sub-forms forms (if (consp sub-forms ) (cdr sub-forms) nil)))
 	       ((null sub-forms))
-		 (when (not (listp (car-safe sub-forms)))
+		 (when (not (listp (car sub-forms)))
 		   (return t)))))
-    (if (and (cadr-safe form) (symbolp (cadr-safe form))) ;; case of a named-prog
-	(if (or (cadr-safe (cdr-safe form)) (check-for-tags (nthcdr 3 form)))
-	    (change form `(block ,(cadr-safe form) ;tags or binding list
+    (if (and (cadr form) (symbolp (cadr form))) ;; case of a named-prog
+	(if (or (cadr (cdr form)) (check-for-tags (nthcdr 3 form)))
+	    (change form `(block ,(cadr form) ;tags or binding list
 			    (prog ,@(nthcdr 2 form))))
-	    (change form `(block nil (block ,(cadr-safe form) ,@(nthcdr 3 form) nil))))
-	(if (or (cadr-safe form)(check-for-tags (nthcdr 2 form)))
+	    (change form `(block nil (block ,(cadr form) ,@(nthcdr 3 form) nil))))
+	(if (or (cadr form)(check-for-tags (nthcdr 2 form)))
 	    (progn ;tags or binding list
 	      (dolist (l (second form))
 		(when (consp l) (dothis (second l) l)))
