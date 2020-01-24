@@ -31,6 +31,7 @@
 	   *clipping-rectangle-left-edge*
 	   *clipping-rectangle-right-edge*
 	   *clipping-rectangle-top-edge*
+	   *common-lisp-on-p*
 	   *common-lisp-symbol-substitutions*
 	   *lisp-mode*
 	   *prindepth*
@@ -38,7 +39,6 @@
 	   *reader-symbol-substitutions*
 	   *zetalisp-symbol-substitutions*
 	   art-32b
-	   common-lisp-on-p
 	   condition-case-throw
 	   defprint
 	   find-system-named
@@ -142,6 +142,7 @@
 
 (defpackage :transl
   (:use cl zwei primitive-zlisp)
+  (:shadowing-import-from primitive-zlisp defstruct)
   (:shadow warning)
   (:import-from si zetalisp-on-p)
   (:export translate-file

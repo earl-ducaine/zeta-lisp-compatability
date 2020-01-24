@@ -170,6 +170,86 @@
 (defvar *print-structure*)
 (defvar *trace*)
 (defvar si::*read-discard-font-changes*)
+(defvar sys:*common-lisp-on-p*)
+
+;; 12/08/88 DNG - Add writing of mode line.  Add CATCH-ERROR-RESTART.
+;; 12/13/88 DNG - Bind *PRINT-STRUCTURE* true.
+;; 12/21/88 DNG - Ensure that *PRINT-LENGTH* and *PRINT-LEVEL* are NIL.
+;;  1/05/89 DNG - Return the truename.
+;;  1/14/89 DNG - Add CASE argument.
+(defun translate-file (ifile ofile &optional trace new-base (case *print-case*))
+  "Translates ifile from zetalisp to ofile Common Lisp. trace set to t
+  will cause all changes to be printed out on *standard-output*.
+  new-base indicates the print base of the translator, nil means use
+  the file's base.  case should be either :upcase or :downcase."
+  (let ((*trace* trace)
+	(eof (cons nil nil))
+	(cl-readtable #.*readtable*))
+    (setq ifile (fs:merge-pathname-defaults ifile :lisp))
+    (setq ofile (fs:merge-pathname-defaults ofile ifile))
+    (clrhash *hook-hash*)
+    (with-open-file (is ifile :direction :input)
+      (with-open-file (os ofile :direction :output :if-exists :new-version)
+	(let ((generic-pathname  (funcall ifile ':generic-pathname)))
+	  (fs:read-attribute-list generic-pathname is)
+	  (multiple-value-bind (vars vals)
+	      (fs:file-attribute-bindings generic-pathname)
+	    (progv vars vals
+	      (let ((si:*read-discard-font-changes* nil )
+		    (*translate-backquote* nil)
+		    (context nil)
+		    (*print-base* (or new-base *print-base*)))
+		(declare (special context))
+		(unless (and (sys:common-lisp-on-p)
+			     (eql *read-base* *print-base*))
+		  (format os ";;; -*- Mode: Lisp; Syntax: Common-Lisp; Package: ~A; Base: ~D -*-~%"
+			  (package-name *package*) *print-base*))
+		(loop
+		   (if (char= (let ((char (peek-char nil is nil eof)))
+				(if (eq char eof )
+				    (return nil)
+				    char)) #\( )
+		       (let (exp (change-occured nil))
+			 (declare (special change-occured))
+			 (let* ((*readtable* (if (zetalisp-on-p )
+						 tr-read
+						 tr-cl-read)))
+
+			   ;; The final argument in zetalisp indicates
+			   ;; that read should ignore unmatched
+			   ;; trailing right parens. Doesn't existe in
+			   ;; ansi CL.
+			   ;; (setf exp (read is nil EOF nil nil t))
+			   (setf exp (read is nil EOF nil))
+			   (when (eq exp eof )
+			     (return nil)))
+			 (with-simple-restart
+			     (translation-error
+			      (str "Leave this form untranslated and proceed "
+				   "with the next top-level form."))
+			 ;; (catch-error-restart
+			 ;;  ((error break)
+			 ;;   (str "Leave this form untranslated and proceed "
+			 ;; 	"with the next top-level form."))
+			   (translate-form exp nil))
+			 (transpose-package exp)
+			 (splice-comment exp)
+			 (let ((*readtable* cl-readtable)
+			       (si:*reader-symbol-substitutions*
+				si:*common-lisp-symbol-substitutions*)
+			       ;; phd 3/15/86 #(1 2 3) will be printed correctly
+			       (*print-array* t)
+			       (*print-structure* t)
+			       (*print-length* nil)
+			       (*print-level* nil)
+			       (*print-case* case))
+			   (pprint  exp os)))
+		       (write-line (let ((line (read-line is nil eof)))
+				     (if (eq line  eof)
+					 (return nil)
+					 line))
+				   os)))))))
+	(truename os)))))
 
 ;; 12/08/88 DNG - Original version.
 ;;  1/05/89 DNG - Avoid possibility of doing the defsystem file twice.
