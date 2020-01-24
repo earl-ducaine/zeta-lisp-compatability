@@ -40,7 +40,8 @@
 ;; The change-occured check avoids all the grinding lossage if there
 ;; are no changes. The with-undo-save means that one can answer Y and
 ;; still go back to the original with a single UNDO.
-(hemlock-internals:defcommand ("Translate Next Sexp" com-translate-next-sexp)  (p)
+(hemlock-internals:defcommand ("Translate Next Sexp" com-translate-next-sexp)
+    (p)
     "Translate Next Sexp in Buffer"
     "Translate Next Sexp in Buffer"
   (let((*context* nil)
@@ -65,7 +66,8 @@
 		   (read  stream nil '*EOF*))))
       (if (or (null form)
 	      (EQ FORM '*EOF*))
-	  (zwei::BARF "there is no form to translate ; position the cursor at the beginning of a form")
+	  (zwei::BARF (str "there is no form to translate ; position "
+			   "the cursor at the beginning of a form"))
 	  (progn
 	    (translate-form form nil)
 	    (transpose-package form)
@@ -73,11 +75,15 @@
 		   (format *query-io* "~&No changes necessary."))
 		  (t
 		   (splice-comment form)
-		   (zwei:with-undo-save ("Translation" (zwei:forward-sexp (zwei:point) -1) (zwei:point) t)
+		   (zwei:with-undo-save
+		       ("Translation" (zwei:forward-sexp (zwei:point) -1)
+				      (zwei:point) t)
 		     (let ((*readtable* #.*readtable*)
 			   (si:*lisp-mode* :common-lisp)
-			   (si:*reader-symbol-substitutions* si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
-		       (pprint form  (zwei::INTERVAL-STREAM-INTO-BP (ZWei::point) t)))
+			   (si:*reader-symbol-substitutions*
+			    si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
+		       (pprint form
+			       (zwei::INTERVAL-STREAM-INTO-BP (ZWei::point) t)))
 		     (zwei::must-redisplay zwei::*window* zwei::dis-text)
 		     (zwei::redisplay zwei::*window* )
 		     (if (y-or-n-p "Is this ok?")
@@ -88,8 +94,9 @@
 			 (hemlock::forward-kill-form-command))))))))
     zwei::dis-text))
 
-(hemlock-internals:defcommand ("Translate Next Sexp Including Backquotes"
-			       com-translate-next-sexp-including-backquotes)  (p)
+(hemlock-internals:defcommand
+    ("Translate Next Sexp Including Backquotes"
+     com-translate-next-sexp-including-backquotes) (p)
     "Translate Next Sexp Including Backquotes"
     "Translate Next Sexp Including Backquotes"
   (declare (ignore p))
@@ -104,11 +111,11 @@
 	   (form (let ((*readtable* (if (zetalisp-on-p)
 					tr-read
 					tr-cl-read))
-		       (si:*read-discard-font-changes* nil ))
-		   ;; the final argument in zetalisp indicates that
+		       (si:*read-discard-font-changes* nil))
+		   ;; The final argument in zetalisp indicates that
 		   ;; read should ignore unmatched trailing right
 		   ;; parens. Doesn't exist in ansi CL.
-		   ;;(read  stream nil '*EOF* nil nil t)
+		   ;; (read  stream nil '*EOF* nil nil t)
 		   (read  stream nil '*eof*))))
       (if (or (null form)
 	      (eq form '*eof*))
@@ -121,11 +128,16 @@
 		   (format *query-io* "~&No changes necessary."))
 		  (t
 		   (splice-comment form)
-		   (zwei:with-undo-save ("Translation" (zwei:forward-sexp (zwei:point) -1) (zwei:point) t)
+		   (zwei:with-undo-save
+		       ("Translation" (zwei:forward-sexp (zwei:point) -1)
+				      (zwei:point) t)
 		     (let ((*readtable* #.*readtable*)
 			   (si:*lisp-mode* :common-lisp)
-			   (si:*READER-SYMBOL-SUBSTITUTIONS* si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS* ))
-		       (pprint form  (zwei::INTERVAL-STREAM-INTO-BP (ZWei::point) t)))
+			   (si:*READER-SYMBOL-SUBSTITUTIONS*
+			    si:*COMMON-LISP-SYMBOL-SUBSTITUTIONS*))
+		       (pprint form (zwei::INTERVAL-STREAM-INTO-BP
+				     (zwei::point)
+				     t)))
 		     (zwei::must-redisplay zwei::*window* zwei::dis-text)
 		     (zwei::redisplay zwei::*window* )
 		     (if (y-or-n-p "Is this ok?")
